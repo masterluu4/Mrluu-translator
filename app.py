@@ -1,7 +1,7 @@
 # app.py
 # Hệ thống Dịch thuật Kỹ thuật bằng AI (Groq LLM qua Cloudflare Proxy)
 # Hỗ trợ: Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)
-# Cơ chế JSON Batching: Dịch 25-30 ô/lần gọi AI - Chuẩn thuật ngữ Ô tô & THACO
+# NÂNG CẤP: Dịch toàn câu (Paragraph-level) giữ nguyên Bold/Font, chống cắt vụn từ (Run-splitting)
 
 import streamlit as st
 import requests
@@ -10,6 +10,7 @@ import time
 import os
 import tempfile
 import re
+import unicodedata
 
 # ----- Thư viện xử lý File -----
 from docx import Document
@@ -33,32 +34,47 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 2. SYSTEM PROMPT CHUYÊN SÂU CHO AI (NGỮ CẢNH THACO & BJM)
+# 2. SYSTEM PROMPT CHUYÊN SÂU CHO BÁO CÁO KỸ THUẬT & 8D THACO
 # ============================================================
-SYSTEM_PROMPT = """You are an expert automotive and after-sales quality management translator at THACO AUTO.
-Translate the values in the provided JSON object from Vietnamese into professional, accurate English.
+SYSTEM_PROMPT = """You are a senior automotive engineering and after-sales quality management translator at THACO AUTO.
+Translate the Vietnamese strings in the provided JSON object into natural, grammatically complete, and professional technical English.
 
-CRITICAL RULES:
-1. Context: Automotive spare parts, bus/truck components, warranty claims, quality inspection, executive presentations, and international shipping (e.g., partner BJM).
-2. Domain terminology examples (for context understanding, adapt naturally to any technical phrase):
-   - "STT" -> "No."
-   - "Số BCKT" -> "Technical Report No."
-   - "Hình thức vận chuyển" -> "Shipping Method"
-   - "BJM xách tay" -> "Hand-carried by BJM"
-   - "Xách tay/ hoặc gửi theo lô hàng xuất khẩu..." -> "Hand-carried / or shipped with export batch on..."
-   - "Chưa có báo cáo" -> "No report yet"
-   - "Mã linh kiện" / "Mã vật tư" -> "Part Number"
-   - "Tên linh kiện" / "Tên vật tư" -> "Part Name"
-   - "Tên tiếng anh" -> "English Name"
-   - "Số lượng" -> "Quantity"
-   - "ĐVT" -> "Unit" ("Cái" -> "Pcs", "Bộ" -> "Set", "Ống" -> "Pipe/Hose")
-   - "Dài-rộng-cao (mm)" -> "L-W-H (mm)"
-   - "Cân nặng (kg)" -> "Weight (kg)"
-   - "Tổng" -> "Total"
-   - Technical parts: "Sacvo ly hợp" -> "Clutch Servo", "Càng đẩy bi T" -> "Clutch Release Fork", "Bạc đạn bi T" -> "Clutch Release Bearing", "Bộ truyền động puly quạt gió" -> "Fan Pulley Drive Assembly", "Ống dẫn nước làm mát" -> "Coolant Hose".
-3. Keep part codes, model numbers (e.g., 1005P320, CNA6128Y-1312010, JS 24V, LH, RH), and dates intact.
-4. If a phrase is ALREADY in correct English (e.g., "LH Headlamp Module", "Clutch Servo"), keep it unchanged.
-5. OUTPUT FORMAT: Return ONLY a valid JSON object with the EXACT same keys ("0", "1", "2", ...) mapped to their translated English strings. Do NOT add markdown blocks, explanations, or extra text."""
+CRITICAL TERMINOLOGY & ABBREVIATIONS AT THACO AUTO:
+1. Report Headers & Sections:
+   - "BÁO CÁO PHÂN TÍCH NGUYÊN NHÂN & GIẢI PHÁP" -> "ROOT CAUSE ANALYSIS & CORRECTIVE ACTION REPORT"
+   - "HẠNG MỤC" -> "ITEM / SUBJECT"
+   - "MÔ TẢ VẤN ĐỀ" -> "PROBLEM DESCRIPTION"
+   - "MÃ SỐ LỖI" -> "DEFECT CODE"
+   - "GIẢI PHÁP KHẮC PHỤC LỖI" -> "CORRECTIVE ACTIONS"
+   - "NGUYÊN NHÂN" -> "ROOT CAUSE" | "Nguyên nhân gốc rễ" -> "Root Cause"
+   - "NỘI DUNG TRIỂN KHAI THỰC HIỆN" -> "IMPLEMENTATION PLAN / ACTIONS"
+   - "TRÁCH NHIỆM" -> "PIC / RESPONSIBILITY"
+   - "H.THÀNH" / "HOÀN THÀNH" -> "TARGET DATE / COMPLETION"
+   - "Tình trạng" -> "Status" | "Theo dõi" -> "Monitoring"
+   - "Hành động phòng ngừa" -> "Preventive Actions"
+   - "Kiểm chứng giải pháp" -> "Solution Verification"
+   - "Trước cải tiến" / "Trước thay đổi" -> "Before Improvement" / "Before Change"
+   - "Sau cải tiến" / "Sau thay đổi" -> "After Improvement" / "After Change"
+2. THACO Departments & Roles:
+   - "BP DVPT" / "BP Dịch vụ" -> "Service & Parts Dept."
+   - "Phòng QLCL KCN" -> "Industrial Park QC Dept."
+   - "BP KTCL NM" -> "Factory QC Dept."
+   - "TT R&D ô tô" / "TT R&D" -> "Automotive R&D Center"
+   - "NCC" / "Nhà cung ứng" / "Nhà cung cấp" -> "Supplier" ("NCC trong nước" -> "Domestic supplier")
+3. Technical & Quality Terms:
+   - "Đối với xe lỗi" -> "For defective vehicles"
+   - "Đối với xe sản xuất tại NM" -> "For vehicles in factory production"
+   - "Đối với xe SBH" / "Sau bán hàng" -> "For After-Sales vehicles" / "After-sales"
+   - "Lũy kế SL lỗi/số xe giao" -> "Cumulative defects / delivered vehicles"
+   - "Dòng xe" -> "Vehicle Model"
+   - "Áp dụng VIN#" -> "Applied from VIN#"
+   - "vật tư" / "linh kiện" -> "part / component" ("vật tư mẫu" -> "sample part", "thu hồi vật tư lỗi" -> "recall defective parts")
+   - "MS:" / "mã số:" -> "Part No.:"
+   - "theo thông báo số..." -> "per Technical Bulletin No...."
+   - "điện trở" -> "resistor", "điện áp" -> "voltage", "tụ điện" -> "capacitor", "cổng sạc" -> "charging port".
+4. Preserve all part numbers (e.g., USB-CDQ23035B, 8129000459), VINs (e.g., RN5B29SEMRN007347), vehicle models (TB120B, TB120S), quantities, percentages, dates, and person names (Mr. Duc, Mr. Viet, Mr. Sinh).
+5. NEVER output broken Vietlish. Translate the entire sentence smoothly and accurately.
+6. OUTPUT FORMAT: Return ONLY a valid JSON object with the EXACT same keys ("0", "1", "2", ...) mapped to their translated English strings. No markdown, no explanations."""
 
 # ============================================================
 # 3. HÀM KẾT NỐI CLOUDFLARE & TỰ ĐỘNG LẤY MODEL SỐNG
@@ -73,7 +89,6 @@ def add_log(message: str, log_placeholder):
     log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
 
 def fetch_live_chat_models(proxy_url: str, direct_key: str = ""):
-    """Lấy danh sách các model Chat thực sự đang hoạt động trên Groq"""
     url = f"{proxy_url.rstrip('/')}/openai/v1/models" if not direct_key else "https://api.groq.com/openai/v1/models"
     headers = {"Content-Type": "application/json"}
     if direct_key:
@@ -86,14 +101,9 @@ def fetch_live_chat_models(proxy_url: str, direct_key: str = ""):
     data = resp.json().get("data", [])
     all_ids = [m["id"] for m in data if m.get("active", True)]
     
-    # Loại bỏ các model âm thanh (whisper/orpheus), bảo vệ (guard), nhúng (embed) hoặc vision
     exclude_keywords = ["whisper", "guard", "orpheus", "tts", "vision", "embed", " tool", "playai"]
-    chat_models = [
-        m for m in all_ids 
-        if not any(ex in m.lower() for ex in exclude_keywords)
-    ]
+    chat_models = [m for m in all_ids if not any(ex in m.lower() for ex in exclude_keywords)]
     
-    # Sắp xếp ưu tiên các model lớn và thông minh lên đầu
     def sort_key(m_name):
         name = m_name.lower()
         if "qwen" in name or "70b" in name: return 0
@@ -106,7 +116,6 @@ def fetch_live_chat_models(proxy_url: str, direct_key: str = ""):
     return chat_models
 
 def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: str, log_placeholder) -> dict:
-    """Gửi cả cụm 25-30 câu lên AI dịch trong 1 lần duy nhất bằng định dạng JSON"""
     url = f"{proxy_url.rstrip('/')}/openai/v1/chat/completions" if not direct_key else "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     if direct_key:
@@ -124,11 +133,10 @@ def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: s
 
     for attempt in range(3):
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=45)
-            # Nếu model không hỗ trợ ép kiểu json_object thì bỏ tham số đó đi và gọi lại
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
             if resp.status_code == 400 and "response_format" in resp.text:
                 payload.pop("response_format", None)
-                resp = requests.post(url, headers=headers, json=payload, timeout=45)
+                resp = requests.post(url, headers=headers, json=payload, timeout=60)
 
             if resp.status_code == 429:
                 add_log("⚠️ Chạm giới hạn tốc độ (429), đang chờ 6 giây...", log_placeholder)
@@ -139,7 +147,6 @@ def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: s
                 raise Exception(f"HTTP {resp.status_code} - {resp.text[:200]}")
 
             content = resp.json()["choices"][0]["message"]["content"].strip()
-            # Xử lý trường hợp model có thẻ <think>...</think> (như Qwen/DeepSeek) trước khi lấy JSON
             content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
             
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
@@ -155,29 +162,45 @@ def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: s
     return batch_dict
 
 # ============================================================
-# 4. LOGIC LỌC & DỊCH FILE GIỮ NGUYÊN ĐỊNH DẠNG
+# 4. BỘ LỌC NHẬN DIỆN TIẾNG VIỆT CHUẨN UNICODE 100%
 # ============================================================
+def has_vietnamese_accents(text: str) -> bool:
+    """Nhận diện chính xác 100% mọi ký tự có dấu tiếng Việt (cả chữ thường lẫn IN HOA)"""
+    if "đ" in text.lower():
+        return True
+    for ch in text:
+        if ord(ch) > 127 and unicodedata.category(ch).startswith("L"):
+            # Kiểm tra ký tự chữ cái có dấu (Latin Extended)
+            decomp = unicodedata.normalize("NFD", ch)
+            if len(decomp) > 1:
+                return True
+    return False
+
 def should_translate(text: str) -> bool:
-    """Chỉ bỏ qua số thuần túy, công thức Excel hoặc mã phụ tùng thuần túy (VD: 1005P320, CNA6128Y-1312010)"""
+    """Bỏ qua dấu câu đứng lẻ, số thuần túy, công thức Excel hoặc mã phụ tùng/số VIN"""
     t = text.strip()
     if not t or t.startswith("="):
         return False
-    # Nếu có bất kỳ chữ cái tiếng Việt có dấu nào -> CHẮC CHẮN PHẢI DỊCH
-    if re.search(r'[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]', t):
+    # Phải có ít nhất 1 chữ cái (bỏ qua các chuỗi chỉ toàn dấu câu như ":", "-", "1.", "20/8/2026")
+    if not any(ch.isalpha() for ch in t):
+        return False
+    # Nếu có dấu tiếng Việt (dù viết thường hay IN HOA toàn bộ) -> BẮT BUỘC DỊCH
+    if has_vietnamese_accents(t):
         return True
-    # Những từ viết tắt không dấu tiếng Việt cần dịch
-    if t.upper() in ["STT", "SL", "TONG"]:
+    # Các từ viết tắt tiếng Việt không dấu cần dịch
+    vn_unaccented_keywords = ["STT", "SL", "TONG", "NGUYEN NHAN", "GIAI PHAP", "MO TA", "MA SO", "TRACH NHIEM"]
+    t_upper = t.upper()
+    if any(k == t_upper or k in t_upper for k in vn_unaccented_keywords):
         return True
-    # Nếu chỉ gồm chữ in hoa, số, dấu gạch ngang/chấm/chéo (Mã phụ tùng, kích thước 390-275-225, ngày tháng) -> Bỏ qua
-    if re.match(r'^[A-Z0-9\-_./&\s()]+$', t):
+    # Nếu chỉ gồm chữ in hoa không dấu + số + ký tự mã hiệu (VD: TB120B, RN5B29SEMRN007347, USB-CDQ23035B) -> Không dịch
+    if re.match(r'^[A-Z0-9\-_./&#\s():%]+$', t):
         return False
     return True
 
 def translate_all_strings(texts: list, model_id: str, proxy_url: str, direct_key: str, log_placeholder, progress_bar) -> list:
     results = list(texts)
     
-    # Gom các chuỗi trùng nhau (Deduplication) để tiết kiệm 50% lượng gọi AI và đồng nhất từ vựng
-    unique_map = {} # clean_text -> list of original indices
+    unique_map = {}
     for idx, raw_text in enumerate(texts):
         if should_translate(raw_text):
             clean = raw_text.strip()
@@ -185,22 +208,22 @@ def translate_all_strings(texts: list, model_id: str, proxy_url: str, direct_key
 
     unique_strings = list(unique_map.keys())
     total_unique = len(unique_strings)
-    add_log(f"🔍 Phát hiện {len(texts)} thành phần văn bản -> Lọc ra {total_unique} câu/cụm từ duy nhất cần AI dịch.", log_placeholder)
+    add_log(f"🔍 Đã gom {len(texts)} đoạn văn thành {total_unique} câu hoàn chỉnh cần AI dịch.", log_placeholder)
 
     if total_unique == 0:
         progress_bar.progress(1.0)
         return results
 
-    # Chia thành từng lô 25 câu để gửi AI
-    BATCH_SIZE = 25
+    # Chia lô 20 câu hoàn chỉnh/lần để AI dịch sâu và chuẩn ngữ cảnh nhất
+    BATCH_SIZE = 20
     translated_unique = {}
     
     for start_idx in range(0, total_unique, BATCH_SIZE):
         batch_slice = unique_strings[start_idx : start_idx + BATCH_SIZE]
         batch_payload = {str(i): s for i, s in enumerate(batch_slice)}
         
-        sample_preview = ", ".join([f"'{s[:20]}'" for s in batch_slice[:3]])
-        add_log(f"🤖 Đang gửi AI ({model_id}) dịch lô {start_idx + 1} -> {start_idx + len(batch_slice)} ({sample_preview}...)", log_placeholder)
+        sample_preview = ", ".join([f"'{s[:25]}...'" if len(s) > 25 else f"'{s}'" for s in batch_slice[:2]])
+        add_log(f"🤖 Đang gửi AI ({model_id}) dịch lô {start_idx + 1} -> {start_idx + len(batch_slice)} ({sample_preview})", log_placeholder)
         
         ai_response = call_ai_batch(batch_payload, model_id, proxy_url, direct_key, log_placeholder)
         
@@ -211,9 +234,8 @@ def translate_all_strings(texts: list, model_id: str, proxy_url: str, direct_key
             translated_unique[original_clean] = trans_val.strip()
             
         progress_bar.progress(min((start_idx + len(batch_slice)) / total_unique, 1.0))
-        time.sleep(1.0) # Nghỉ nhẹ 1s giữa các lô
+        time.sleep(0.8)
 
-    # Điền trả lại vào đúng vị trí các ô ban đầu (giữ nguyên khoảng trắng đầu/cuối nếu có)
     for clean_str, indices in unique_map.items():
         trans_str = translated_unique.get(clean_str, clean_str)
         for idx in indices:
@@ -225,7 +247,66 @@ def translate_all_strings(texts: list, model_id: str, proxy_url: str, direct_key
     return results
 
 # ============================================================
-# 5. CÁC HÀM XỬ LÝ FILE (EXCEL, WORD, POWERPOINT, PDF)
+# 5. THUẬT TOÁN GOM CÂU THÔNG MINH CHO POWERPOINT & WORD
+# (Chống cắt vụn chữ Run-splitting & Bảo toàn In đậm đầu dòng)
+# ============================================================
+class ParagraphSegment:
+    """Đại diện cho 1 cụm liên tiếp các run có cùng định dạng trong 1 đoạn văn"""
+    def __init__(self, runs):
+        self.runs = runs
+        self.text = "".join(r.text for r in runs if r.text)
+
+    def apply_translation(self, new_text: str):
+        if not self.runs:
+            return
+        # Gán toàn bộ câu đã dịch vào run đầu tiên (giữ nguyên font, size, màu sắc, bold của nhóm)
+        self.runs[0].text = new_text
+        # Xóa rỗng các run bị băm nhỏ phía sau để không bị lặp chữ
+        for r in self.runs[1:]:
+            r.text = ""
+
+def collect_paragraph_segments(paragraph, segments_list, texts_list):
+    """
+    Gom các run bị cắt vụn trong 1 paragraph thành câu hoàn chỉnh:
+    - Nếu dòng có dạng 'Tiêu đề in đậm: Nội dung thường' -> Tách đúng tại dấu ':' thành 2 vế để giữ nguyên in đậm vế đầu.
+    - Nếu toàn bộ dòng cùng kiểu -> Gom hết tất cả các run thành 1 câu duy nhất để AI dịch chuẩn 100% ngữ pháp.
+    """
+    runs = [r for r in paragraph.runs if r.text is not None]
+    if not runs:
+        return
+    full_text = "".join(r.text for r in runs)
+    if not full_text.strip():
+        return
+
+    # Kiểm tra xem có sự chuyển tiếp từ In Đậm (Bold) sang Chữ Thường sau dấu ':' hay không
+    split_idx = None
+    acc_text = ""
+    for i in range(len(runs) - 1):
+        acc_text += runs[i].text
+        b_cur = bool(runs[i].font.bold)
+        b_next = bool(runs[i + 1].font.bold)
+        # Nếu đang ở quanh dấu ':' và có sự đổi trạng thái Bold (VD: "1. Vấn đề:" [Bold] + " Hư hỏng..." [Normal])
+        if b_cur != b_next and (":" in acc_text and len(acc_text.strip()) <= 45):
+            split_idx = i + 1
+            break
+
+    if split_idx is not None:
+        seg1 = ParagraphSegment(runs[:split_idx])
+        seg2 = ParagraphSegment(runs[split_idx:])
+        if seg1.text.strip():
+            segments_list.append(seg1)
+            texts_list.append(seg1.text)
+        if seg2.text.strip():
+            segments_list.append(seg2)
+            texts_list.append(seg2.text)
+    else:
+        # Gom toàn bộ các run trong paragraph thành 1 câu hoàn chỉnh duy nhất
+        seg = ParagraphSegment(runs)
+        segments_list.append(seg)
+        texts_list.append(seg.text)
+
+# ============================================================
+# 6. CÁC HÀM XỬ LÝ FILE (EXCEL, WORD, POWERPOINT, PDF)
 # ============================================================
 def process_excel(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
     add_log("📂 Đang mở file Excel và quét các Sheet...", log_placeholder)
@@ -247,79 +328,62 @@ def process_excel(input_path, output_path, model_id, proxy_url, direct_key, log_
     wb.save(output_path)
 
 def process_word(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
-    add_log("📂 Đang mở file Word...", log_placeholder)
+    add_log("📂 Đang mở file Word và gom các câu văn...", log_placeholder)
     doc = Document(input_path)
-    runs, texts = [], []
+    segments, texts = [], []
     
     for p in doc.paragraphs:
-        for r in p.runs:
-            if r.text.strip():
-                runs.append(r); texts.append(r.text)
+        collect_paragraph_segments(p, segments, texts)
+        
     for t in doc.tables:
         for row in t.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
-                    for r in p.runs:
-                        if r.text.strip():
-                            runs.append(r); texts.append(r.text)
+                    collect_paragraph_segments(p, segments, texts)
                             
     translated = translate_all_strings(texts, model_id, proxy_url, direct_key, log_placeholder, progress_bar)
-    for r, new_val in zip(runs, translated):
-        r.text = new_val
+    for seg, new_val in zip(segments, translated):
+        seg.apply_translation(new_val)
         
     add_log("💾 Đang lưu file Word...", log_placeholder)
     doc.save(output_path)
 
-def extract_pptx_shape_runs(shape, runs_list, texts_list):
-    """Hàm đệ quy quét toàn bộ Text Frame, Bảng (Table) và Group Shapes trong PowerPoint"""
-    # 1. Nếu shape là một Group (nhóm nhiều hình lại với nhau) -> Quét đệ quy bên trong
+def extract_pptx_shape_paragraphs(shape, segments_list, texts_list):
+    """Đệ quy quét toàn bộ Text Frame, Table và Group Shapes theo cấp độ Câu/Đoạn văn (Paragraph)"""
     if shape.shape_type == 6: # MSO_SHAPE_TYPE.GROUP
         for sub_shape in shape.shapes:
-            extract_pptx_shape_runs(sub_shape, runs_list, texts_list)
+            extract_pptx_shape_paragraphs(sub_shape, segments_list, texts_list)
             
-    # 2. Nếu shape có chứa khung văn bản (Text Box, AutoShape, Title...)
     if shape.has_text_frame:
         for p in shape.text_frame.paragraphs:
-            for r in p.runs:
-                if r.text and r.text.strip():
-                    runs_list.append(r)
-                    texts_list.append(r.text)
+            collect_paragraph_segments(p, segments_list, texts_list)
                     
-    # 3. Nếu shape là Bảng biểu (Table) trên Slide
     if shape.has_table:
         for row in shape.table.rows:
             for cell in row.cells:
                 for p in cell.text_frame.paragraphs:
-                    for r in p.runs:
-                        if r.text and r.text.strip():
-                            runs_list.append(r)
-                            texts_list.append(r.text)
+                    collect_paragraph_segments(p, segments_list, texts_list)
 
 def process_pptx(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
-    add_log("📂 Đang mở file PowerPoint và quét tất cả các Slide...", log_placeholder)
+    add_log("📂 Đang mở file PowerPoint và gom câu trên tất cả các Slide...", log_placeholder)
     prs = Presentation(input_path)
-    runs, texts = [], []
+    segments, texts = [], []
     
-    for slide_idx, slide in enumerate(prs.slides):
-        # Quét toàn bộ đối tượng trên Slide (Shape, Table, Group...)
+    for slide in prs.slides:
         for shape in slide.shapes:
-            extract_pptx_shape_runs(shape, runs, texts)
+            extract_pptx_shape_paragraphs(shape, segments, texts)
             
-        # Quét luôn phần Ghi chú của diễn giả (Speaker Notes) nếu có
         if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
             for p in slide.notes_slide.notes_text_frame.paragraphs:
-                for r in p.runs:
-                    if r.text and r.text.strip():
-                        runs.append(r)
-                        texts.append(r.text)
+                collect_paragraph_segments(p, segments, texts)
                         
-    add_log(f"📊 Đã quét {len(prs.slides)} Slide (gồm Textbox, Table, Group & Notes).", log_placeholder)
+    add_log(f"📊 Đã quét {len(prs.slides)} Slide -> Hợp nhất thành {len(segments)} đoạn văn nguyên vẹn.", log_placeholder)
     translated = translate_all_strings(texts, model_id, proxy_url, direct_key, log_placeholder, progress_bar)
     
-    for r, new_val in zip(runs, translated):
-        r.text = new_val
+    for seg, new_val in zip(segments, translated):
+        seg.apply_translation(new_val)
         
-    add_log("💾 Đang lưu file PowerPoint hoàn thiện (giữ nguyên 100% bố cục, màu sắc, font chữ)...", log_placeholder)
+    add_log("💾 Đang lưu file PowerPoint hoàn thiện (giữ nguyên bố cục, màu sắc, font chữ)...", log_placeholder)
     prs.save(output_path)
 
 def process_pdf(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
@@ -339,10 +403,10 @@ def process_pdf(input_path, output_path, model_id, proxy_url, direct_key, log_pl
         os.remove(temp_docx)
 
 # ============================================================
-# 6. GIAO DIỆN CHÍNH
+# 7. GIAO DIỆN CHÍNH
 # ============================================================
 st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Hỗ trợ Excel, Word, PowerPoint, PDF • Dịch chuẩn ngữ cảnh Kỹ thuật & Phụ tùng • Giữ nguyên cấu trúc File</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Hỗ trợ Excel, Word, PowerPoint, PDF • Dịch toàn câu chuẩn ngữ cảnh 8D/QA/QC • Giữ nguyên cấu trúc File</p>', unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1.25, 2])
 
@@ -361,7 +425,6 @@ with col_left:
             except Exception as e:
                 st.error(f"❌ Lỗi kết nối: {str(e)}")
 
-        # Đưa qwen/qwen3.8-27b lên làm model mặc định đầu tiên
         model_list = st.session_state.get("available_models", [
             "qwen/qwen3.8-27b",
             "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -383,8 +446,8 @@ with col_right:
     log_placeholder = st.empty()
     log_placeholder.markdown(
         "<div class='log-container'>Hệ thống AI sẵn sàng!<br>"
-        "• Đã hỗ trợ: <b>Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)</b>.<br>"
-        "👉 Hướng dẫn: Kiểm tra kết nối Model AI -> Tải file lên -> Bấm <b>Bắt đầu dịch bằng AI</b>.</div>",
+        "• Đã nâng cấp thuật toán <b>Paragraph-Level</b>: Chống cắt vụn chữ trong PowerPoint & Word.<br>"
+        "• Tích hợp bộ thuật ngữ Báo cáo Phân tích Nguyên nhân & Giải pháp THACO AUTO.</div>",
         unsafe_allow_html=True
     )
     
