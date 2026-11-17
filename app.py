@@ -1,6 +1,6 @@
 # app.py
-# Ứng dụng Dịch tài liệu Kỹ thuật Mrluu
-# Sử dụng Groq API (Llama 3.1 70B) qua Cloudflare Proxy bảo mật
+# Ứng dụng Dịch tài liệu Kỹ thuật THACO
+# Sử dụng Groq API qua Cloudflare Proxy bảo mật (Tích hợp Auto-Discovery Model)
 
 import streamlit as st
 import time
@@ -16,7 +16,7 @@ from pdf2docx import Converter
 # ============================================================
 # 1. CẤU HÌNH GIAO DIỆN & CSS
 # ============================================================
-st.set_page_config(page_title="Mrluu Technical Translator", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="THACO Technical Translator", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
@@ -39,15 +39,13 @@ Requirements:
 # ============================================================
 # 3. KHỞI TẠO GROQ API (QUA CLOUDFLARE PROXY)
 # ============================================================
-# BƯỚC QUAN TRỌNG: Thay đường dẫn Cloudflare Worker của anh vào đây
-# Ví dụ: "https://thaco-groq-proxy.ten-cua-anh.workers.dev"
+# BƯỚC QUAN TRỌNG: Thay đường dẫn Cloudflare Worker của bạn vào đây
 CLOUDFLARE_WORKER_URL = "https://mrluu-groq-proxy.mrscong4.workers.dev"
 
 def get_groq_client():
     """Khởi tạo Groq client trỏ về proxy Cloudflare thay vì server gốc"""
     return Groq(
         api_key="hidden-by-cloudflare", 
-        # Chỉ giữ lại đúng biến URL gốc, xóa bỏ đoạn f"{...}/openai/v1"
         base_url=CLOUDFLARE_WORKER_URL
     )
 
@@ -77,20 +75,18 @@ def translate_text(client: Groq, text: str, log_placeholder) -> str:
 
     for attempt in range(3):
         try:
-            # Gọi LLM Llama 3.1 70B thông qua OpenAI format của Groq
             response = client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": core}
                 ],
-                model="llama3-70b-8192",
+                # Lấy model đã được hệ thống tự động dò tìm
+                model=st.session_state.get("selected_model", "llama-3.1-8b-instant"),
                 temperature=0.2, 
                 max_tokens=1024
             )
             
             translated = response.choices[0].message.content.strip()
-            
-            # Nghỉ 1.5 giây để tránh bị Groq chặn rate limit
             time.sleep(1.5) 
             return lead + translated + trail
             
@@ -108,7 +104,7 @@ def translate_text(client: Groq, text: str, log_placeholder) -> str:
     return lead + core + trail
 
 # ============================================================
-# 5. CÁC HÀM XỬ LÝ FILE (GIỮ NGUYÊN ĐỊNH DẠNG)
+# 5. CÁC HÀM XỬ LÝ FILE
 # ============================================================
 def process_excel(input_path, output_path, client, log_placeholder, progress_bar):
     wb = openpyxl.load_workbook(input_path)
@@ -182,10 +178,10 @@ def process_pdf(input_path, output_path, client, log_placeholder, progress_bar):
         os.remove(temp_docx)
 
 # ============================================================
-# 6. GIAO DIỆN CHÍNH (ĐÃ LƯỢC BỎ Ô NHẬP KEY)
+# 6. GIAO DIỆN CHÍNH
 # ============================================================
-st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật Kỹ thuật Mrluu</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Sức mạnh Llama 3.1 70B (Proxy bảo mật) • Siêu tốc & Bảo toàn Cấu trúc</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật Kỹ thuật THACO</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Auto-Discovery Model (Chống lỗi 404/400) • Siêu tốc & Bảo toàn Cấu trúc</p>', unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1.2, 2])
 
@@ -218,8 +214,23 @@ with col_right:
             output_path = input_path.replace(file_ext, f"_out{output_ext}")
 
             try:
-                # Gọi client đã được cấu hình trỏ về proxy
                 client = get_groq_client()
+                
+                # --- TÍNH NĂNG TỰ ĐỘNG DÒ TÌM MODEL ---
+                add_log("Đang dò tìm danh sách Model khả dụng (Chống lỗi 404/400)...", log_placeholder)
+                try:
+                    available_models = [m.id for m in client.models.list().data]
+                    # Ưu tiên các model mạnh nhất, nếu không có sẽ tự lùi về model thấp hơn
+                    priorities = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+                    
+                    selected_model = next((m for m in priorities if m in available_models), available_models[0])
+                    st.session_state.selected_model = selected_model
+                    add_log(f"✅ Đã kết nối tự động tới model: {selected_model}", log_placeholder)
+                except Exception as e:
+                    st.session_state.selected_model = "llama-3.1-8b-instant"
+                    add_log("⚠️ Chạy model dự phòng: llama-3.1-8b-instant", log_placeholder)
+                # --------------------------------------
+
                 pb = progress_bar.progress(0.0)
                 
                 if file_ext == ".docx": process_word(input_path, output_path, client, log_placeholder, pb)
