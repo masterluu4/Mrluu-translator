@@ -1,5 +1,5 @@
 # app.py
-# Ứng dụng Dịch tài liệu Kỹ thuật THACO
+# Ứng dụng Dịch tài liệu Kỹ thuật Mrluu
 # Sử dụng Groq API (Llama 3.1 70B) qua Cloudflare Proxy bảo mật
 
 import streamlit as st
@@ -16,7 +16,7 @@ from pdf2docx import Converter
 # ============================================================
 # 1. CẤU HÌNH GIAO DIỆN & CSS
 # ============================================================
-st.set_page_config(page_title="THACO Technical Translator", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="Mrluu Technical Translator", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
@@ -46,9 +46,9 @@ CLOUDFLARE_WORKER_URL = "https://mrluu-groq-proxy.mrscong4.workers.dev"
 def get_groq_client():
     """Khởi tạo Groq client trỏ về proxy Cloudflare thay vì server gốc"""
     return Groq(
-        # Thư viện yêu cầu api_key không được rỗng, ta điền bừa vì Key thật đã nằm trên Cloudflare
         api_key="hidden-by-cloudflare", 
-        base_url=f"{CLOUDFLARE_WORKER_URL}/openai/v1"
+        # Chỉ giữ lại đúng biến URL gốc, xóa bỏ đoạn f"{...}/openai/v1"
+        base_url=CLOUDFLARE_WORKER_URL
     )
 
 # ============================================================
@@ -184,7 +184,7 @@ def process_pdf(input_path, output_path, client, log_placeholder, progress_bar):
 # ============================================================
 # 6. GIAO DIỆN CHÍNH (ĐÃ LƯỢC BỎ Ô NHẬP KEY)
 # ============================================================
-st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật Kỹ thuật THACO</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật Kỹ thuật Mrluu</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">Sức mạnh Llama 3.1 70B (Proxy bảo mật) • Siêu tốc & Bảo toàn Cấu trúc</p>', unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1.2, 2])
