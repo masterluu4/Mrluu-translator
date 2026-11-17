@@ -83,7 +83,7 @@ def translate_text(client: Groq, text: str, log_placeholder) -> str:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": core}
                 ],
-                model="llama-3.3-70b-versatile",
+                model="llama3-70b-8192",
                 temperature=0.2, 
                 max_tokens=1024
             )
