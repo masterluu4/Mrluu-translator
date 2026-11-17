@@ -63,7 +63,7 @@ def verify_api_key(api_key: str):
     """Gửi một request nhỏ để test API Key"""
     try:
         genai.configure(api_key=api_key)
-        test_model = genai.GenerativeModel("gemini-1.5-pro")
+        test_model = genai.GenerativeModel("gemini-flash-latest")
         test_model.generate_content("Hi")
         return True, "Kết nối API Google Gemini thành công!"
     except Exception as e:
@@ -71,7 +71,7 @@ def verify_api_key(api_key: str):
 
 def init_gemini():
     return genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-flash-latest",
         system_instruction=SYSTEM_PROMPT,
     )
 
