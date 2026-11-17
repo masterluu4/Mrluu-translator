@@ -1,6 +1,5 @@
 # app.py
-# Hệ thống Dịch thuật AI Chuyên ngành Kỹ thuật & Ô tô (THACO AUTO)
-# Nâng cấp: Anti-Rate-Limit, Bilingual Mode, Translation Memory, Interactive Review, Auto-Fit Layout.
+# THACO AI Technical Translator PRO - Full Features & Robust Logic
 
 import streamlit as st
 import requests
@@ -20,7 +19,7 @@ from pptx import Presentation
 DEFAULT_PROXY_URL = "https://mrluu-groq-proxy.mrscong4.workers.dev"
 TM_FILE = "translation_memory.json"
 
-st.set_page_config(page_title="THACO AI Technical Translator Pro", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="Mr lưu AI Technical Translator PRO", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
@@ -31,7 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 1. QUẢN LÝ BỘ NHỚ ĐỆM DỊCH THUẬT (TRANSLATION MEMORY)
+# 1. BỘ NHỚ ĐỆM DỊCH THUẬT (TRANSLATION MEMORY - TM)
 # ============================================================
 def load_tm() -> dict:
     if os.path.exists(TM_FILE):
@@ -53,15 +52,16 @@ if "tm_data" not in st.session_state:
     st.session_state.tm_data = load_tm()
 
 # ============================================================
-# 2. SYSTEM PROMPT CHUYÊN SÂU
+# 2. SYSTEM PROMPT CHUYÊN SÂU NGÀNH Ô TÔ & QUẢN LÝ CHẤT LƯỢNG
 # ============================================================
 SYSTEM_PROMPT = """You are a senior automotive engineering and after-sales quality management translator at THACO AUTO.
-Translate the strings in the provided JSON object accurately according to the selected direction.
+Translate the text strings in the provided JSON object accurately and professionally.
 
-CRITICAL RULES:
-1. Domain: Automotive spare parts, 8D reports, technical inspection, warranty claims, and international shipping (e.g., partner BJM).
-2. Keep all part numbers (e.g., USB-CDQ23035B, 1005P320), VINs, vehicle models (TB120B, TB120S), quantities, percentages, dates, and person names intact.
-3. OUTPUT FORMAT: Return ONLY a valid JSON object with the EXACT same keys ("0", "1", "2", ...) mapped to their translated strings. No markdown blocks, no explanations."""
+DOMAIN CONTEXT & RULES:
+1. Terminology: Use standard automotive manufacturing, 8D report, and after-sales terms (e.g., Root Cause, Corrective Action, Preventive Action, Part Number, Charging Port, Resistor, Voltage, Supplier, Warranty Claim).
+2. Preservation: Keep all part numbers (e.g., USB-CDQ23035B, 1005P320), VIN numbers, vehicle models (TB120B, TB120S), quantities, percentages, dates, and person names completely intact.
+3. Flow: Ensure the translation reads like a professional technical report rather than a word-for-word translation.
+4. OUTPUT FORMAT: Return ONLY a valid JSON object with the exact same keys mapping to their translated strings. No markdown formatting blocks, no explanations."""
 
 # ============================================================
 # 3. KẾT NỐI AI & GỌI BATCH AN TOÀN (CHỐNG LỖI 429)
@@ -127,7 +127,7 @@ def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: s
 
             if resp.status_code == 429:
                 wait_time = 8 * (attempt + 1)
-                add_log(f"⚠️ Chạm giới hạn tốc độ (429), đang nghỉ {wait_time} giây để bảo vệ kết nối...", log_placeholder)
+                add_log(f"⚠️ Giới hạn tốc độ (429), đang chờ {wait_time} giây...", log_placeholder)
                 time.sleep(wait_time)
                 continue
 
@@ -149,7 +149,7 @@ def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: s
     return batch_dict
 
 # ============================================================
-# 4. BỘ LỌC VÀ XỬ LÝ ĐOẠN VĂN
+# 4. BỘ LỌC ĐOẠN VĂN & XỬ LÝ DỊCH
 # ============================================================
 def should_translate(text: str, direction: str) -> bool:
     t = text.strip()
@@ -158,17 +158,14 @@ def should_translate(text: str, direction: str) -> bool:
     if not any(ch.isalpha() for ch in t):
         return False
     if direction == "Việt → Anh":
-        if unicodedata:
-            pass
         if re.search(r'[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđĐ]', t):
             return True
-        if t.upper() in ["STT", "SL", "TONG", "NGUYEN NHAN", "GIAI PHAP"]:
+        if t.upper() in ["STT", "SL", "TONG", "NGUYEN NHAN", "GIAI PHAP", "MO TA"]:
             return True
         if re.match(r'^[A-Z0-9\-_./&#\s():%]+$', t):
             return False
         return True
     else:
-        # Anh -> Việt: dịch mọi chuỗi tiếng Anh có ý nghĩa
         if re.match(r'^[0-9\-_./&#\s():%]+$', t):
             return False
         return True
@@ -193,10 +190,10 @@ def process_translation_batch(texts: list, model_id: str, proxy_url: str, direct
         else:
             to_translate.append(u)
 
-    add_log(f"🔍 Tổng số đoạn: {len(texts)} | Đã có trong TM: {len(uniques) - len(to_translate)} | Cần AI dịch: {len(to_translate)}", log_placeholder)
+    add_log(f"🔍 Tổng số đoạn: {len(texts)} | Lấy từ Bộ nhớ đệm (TM): {len(uniques) - len(to_translate)} | Cần AI dịch: {len(to_translate)}", log_placeholder)
 
     if to_translate:
-        BATCH_SIZE = 15  # Gom nhóm nhỏ 15 câu để tuyệt đối không bị dính lỗi 429
+        BATCH_SIZE = 12  # Lô nhỏ gọn để đảm bảo an toàn tuyệt đối qua Cloudflare
         for start in range(0, len(to_translate), BATCH_SIZE):
             slice_items = to_translate[start : start + BATCH_SIZE]
             payload = {str(i): s for i, s in enumerate(slice_items)}
@@ -214,20 +211,20 @@ def process_translation_batch(texts: list, model_id: str, proxy_url: str, direct
             
             save_tm(tm)
             progress_bar.progress(min((start + len(slice_items)) / len(to_translate), 1.0))
-            time.sleep(2.0)  # Sleep an toàn chống Rate Limit
+            time.sleep(1.5)
 
     for clean_str, indices in unique_map.items():
         trans = translated_cache.get(clean_str, clean_str)
         for idx in indices:
             orig = texts[idx]
-            lead = orig[:len(orig) - len(orig.lsteri() if hasattr(orig, 'lsteri') else orig.lstrip())]
+            lead = orig[:len(orig) - len(orig.lstrip())]
             trail = orig[len(orig.rstrip()):]
             results[idx] = lead + trans + trail
 
     return results
 
 # ============================================================
-# 5. XỬ LÝ ĐỊNH DẠNG TỪNG LOẠI FILE (EXCEL, WORD, PPTX)
+# 5. XỬ LÝ ĐỊNH DẠNG FILE
 # ============================================================
 class ParagraphSegment:
     def __init__(self, runs):
@@ -254,10 +251,10 @@ def collect_segments(p, segs, texts):
     texts.append(seg.text)
 
 def process_excel(input_path, output_path, model_id, proxy_url, direct_key, direction, bilingual, log_placeholder, progress_bar):
-    add_log("📂 Đang quét Sheet & Tabs Excel...", log_placeholder)
+    add_log("📂 Đang quét Sheets & Tabs Excel...", log_placeholder)
     wb = openpyxl.load_workbook(input_path)
     
-    # Dịch tên các Sheet tab ở dưới
+    # Dịch tên các tab Sheet dưới chân file Excel
     sheet_titles = wb.sheetnames
     trans_titles = process_translation_batch(sheet_titles, model_id, proxy_url, direct_key, direction, log_placeholder, progress_bar)
     for old_t, new_t in zip(sheet_titles, trans_titles):
@@ -270,7 +267,7 @@ def process_excel(input_path, output_path, model_id, proxy_url, direct_key, dire
                 if isinstance(cell.value, str) and cell.value.strip():
                     cells.append(cell)
                     texts.append(cell.value)
-                    cell.alignment = openpyxl.styles.Alignment(wrap_text=True) # Auto-Fit Layout wrap text
+                    cell.alignment = openpyxl.styles.Alignment(wrap_text=True)
 
     translated = process_translation_batch(texts, model_id, proxy_url, direct_key, direction, log_placeholder, progress_bar)
     for cell, orig, new_val in zip(cells, texts, translated):
@@ -344,7 +341,7 @@ def process_pdf(input_path, output_path, model_id, proxy_url, direct_key, direct
 # 6. GIAO DIỆN STREAMLIT PRO
 # ============================================================
 st.markdown('<p class="main-title">⚡ THACO AI Technical Translator PRO</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Chống lỗi Rate Limit 429 • Song Ngữ • Dịch Đa Chiều • Bộ nhớ đệm TM • Hiệu đính Nhanh</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Chống lỗi 429 • Song Ngữ • Dịch Đa Chiều • Bộ nhớ đệm TM • Auto-Fit Layout</p>', unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1.3, 2])
 
@@ -366,14 +363,13 @@ with col_left:
         selected_model = st.selectbox("🤖 Chọn Model AI:", options=model_list)
 
         direction = st.radio("🌐 Chiều dịch:", ["Việt → Anh", "Anh → Việt"], horizontal=True)
-        bilingual = st.checkbox("📖 Xuất Song Ngữ (Việt kèm bản dịch dòng dưới)", value=False)
-        enable_review = st.checkbox("✍️ Bật bảng 'Hiệu đính Nhanh' trước khi xuất file", value=True)
+        bilingual = st.checkbox("📖 Xuất Song Ngữ (Nối tiếp dòng dưới)", value=False)
 
     st.markdown("### 📂 2. Tải lên Tài liệu")
     uploaded_file = st.file_uploader("Hỗ trợ Excel, Word, PowerPoint, PDF", type=["xlsx", "docx", "pptx", "pdf"])
 
 with col_right:
-    st.markdown("### 🖥️ Màn hình Giám sát & Hiệu đính")
+    st.markdown("### 🖥️ Màn hình Giám sát & Nhật ký")
     log_placeholder = st.empty()
     log_placeholder.markdown("<div class='log-container'>Hệ thống sẵn sàng bảo mật qua Cloudflare Worker.</div>", unsafe_allow_html=True)
     
@@ -390,41 +386,11 @@ with col_right:
                 tmp_in.write(uploaded_file.getbuffer())
                 input_path = tmp_in.name
 
-            # Trích xuất văn bản trước để người dùng review nếu bật tính năng Hiệu đính
+            output_ext = ".docx" if file_ext == ".pdf" else file_ext
+            output_name = uploaded_file.name.replace(file_ext, f"_Pro_EN{output_ext}")
+            output_path = input_path.replace(file_ext, f"_out{output_ext}")
+
             try:
-                # Demo trích xuất nhanh để đưa vào bảng data_editor
-                sample_texts = []
-                if file_ext == ".xlsx":
-                    wb_tmp = openpyxl.load_workbook(input_path)
-                    for ws in wb_tmp.worksheets:
-                        for row in ws.iter_rows():
-                            for c in row:
-                                if isinstance(c.value, str) and c.value.strip(): sample_texts.append(c.value)
-                elif file_ext in [".docx", ".pptx"]:
-                    # Lấy nhanh mẫu text
-                    sample_texts = ["Mẫu văn bản trích xuất từ tài liệu kỹ thuật THACO"]
-
-                # Nếu bật Hiệu đính Nhanh
-                translated_map = {}
-                if enable_review and sample_texts:
-                    add_log("✍️ Đang chuẩn bị dữ liệu cho bảng Hiệu đính Nhanh...", log_placeholder)
-                    pb_rev = progress_bar.progress(0.1)
-                    raw_trans = process_translation_batch(sample_texts[:50], selected_model, proxy_url, direct_key, direction, log_placeholder, pb_rev)
-                    
-                    import pandas as pd
-                    df_review = pd.DataFrame({"Câu gốc": sample_texts[:50], "Bản dịch AI (Có thể sửa tay)": raw_trans})
-                    
-                    st.markdown("#### ✍️ Hiệu đính Nhanh trước khi xuất file:")
-                    edited_df = st.data_editor(df_review, use_container_width=True, key="review_table")
-                    
-                    if st.button("✅ Xác nhận & Xuất File Hoàn Thiện"):
-                        pass # Tiến hành xuất file bên dưới
-
-                # Tiến hành xử lý xuất file chính thức
-                output_ext = ".docx" if file_ext == ".pdf" else file_ext
-                output_name = uploaded_file.name.replace(file_ext, f"_Pro_EN{output_ext}")
-                output_path = input_path.replace(file_ext, f"_out{output_ext}")
-
                 pb = progress_bar.progress(0.0)
                 start_t = time.time()
                 
@@ -433,7 +399,7 @@ with col_right:
                 elif file_ext == ".docx":
                     process_word(input_path, output_path, selected_model, proxy_url, direct_key, direction, bilingual, log_placeholder, pb)
                 elif file_ext == ".pptx":
-                    process_pptx(input_path, output_path, model_id=selected_model, proxy_url=proxy_url, direct_key=direct_key, direction=direction, bilingual=bilingual, log_placeholder=log_placeholder, progress_bar=pb)
+                    process_pptx(input_path, output_path, selected_model, proxy_url, direct_key, direction, bilingual, log_placeholder, pb)
                 elif file_ext == ".pdf":
                     process_pdf(input_path, output_path, selected_model, proxy_url, direct_key, direction, bilingual, log_placeholder, pb)
 
@@ -451,4 +417,4 @@ with col_right:
                 add_log(f"❌ LỖI: {str(e)}", log_placeholder)
             finally:
                 if os.path.exists(input_path):
-                    os.path.exists(input_path)
+                    os.remove(input_path)
