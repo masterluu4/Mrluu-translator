@@ -1,6 +1,6 @@
 # app.py
-# THACO AI TECHNICAL TRANSLATOR PRO (V6.1 - CLEAN DASHBOARD UI)
-# Giữ nguyên 100% Logic V6.0 + Tối ưu hóa Bố cục: Đưa khung Upload File lên đầu, gom Cấu hình vào Sidebar gọn gàng
+# MASTERLUU PRO - HỆ THỐNG DỊCH THUẬT AI CHUYÊN NGÀNH Ô TÔ (V7.0 - DIGITAL COCKPIT UI)
+# Giữ nguyên 100% Logic Dịch thuật & Đồng bộ Google Sheets + Giao diện Enterprise SaaS Hiện đại
 
 import streamlit as st
 import requests
@@ -34,26 +34,291 @@ TM_FILE = "translation_memory.json"
 GLOSSARY_FILE = "thaco_glossary.txt"
 
 st.set_page_config(
-    page_title="MASTERLUU AI Technical Translator PRO",
+    page_title="MASTERLUU PRO | Automotive AI Translator",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# ============================================================
+# 2. HỆ THỐNG GIAO DIỆN KỸ THUẬT SỐ (DIGITAL COCKPIT CSS V7.0)
+# ============================================================
 st.markdown("""
     <style>
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
-    .main-title { font-size: 28px !important; font-weight: 800; color: #1E3A8A; margin-bottom: 0px; }
-    .sub-title { font-size: 13.5px; color: #475569; margin-bottom: 12px; }
-    .log-container { background-color: #0F172A; color: #10B981; font-family: 'Courier New', monospace; padding: 14px; border-radius: 8px; height: 295px; overflow-y: auto; font-size: 12.5px; line-height: 1.55; border: 1px solid #1E293B; }
-    .badge-pro { background-color: #DBEAFE; color: #1D4ED8; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; }
-    .badge-cloud { background-color: #DCFCE7; color: #15803D; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; margin-left: 6px; }
-    .stat-box { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #334155; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    /* Nền tổng thể & Căn chỉnh chống che khuất bởi Header Streamlit */
+    .stApp {
+        background: linear-gradient(160deg, #F1F5F9 0%, #E2E8F0 100%);
+        font-family: 'Inter', sans-serif;
+    }
+    .block-container {
+        padding-top: 3.6rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 97% !important;
+    }
+
+    /* Thanh Sidebar phong cách Dark Industrial */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%) !important;
+        border-right: 1px solid #334155;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #F8FAFC !important;
+    }
+    section[data-testid="stSidebar"] .stTextInput input,
+    section[data-testid="stSidebar"] .stTextArea textarea,
+    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+        background-color: #1E293B !important;
+        color: #F8FAFC !important;
+        border: 1px solid #475569 !important;
+        border-radius: 8px !important;
+    }
+    section[data-testid="stSidebar"] details {
+        background-color: rgba(30, 41, 59, 0.75) !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px !important;
+        margin-bottom: 10px !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button {
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
+        border: 1px solid #3B82F6 !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+    }
+
+    /* HERO BANNER ĐẲNG CẤP TRÊN CÙNG */
+    .hero-banner {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #1D4ED8 100%);
+        padding: 20px 28px;
+        border-radius: 16px;
+        color: #FFFFFF;
+        box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.28);
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .hero-title {
+        font-size: 25px;
+        font-weight: 800;
+        letter-spacing: -0.3px;
+        margin: 0 0 6px 0;
+        color: #FFFFFF;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .hero-sub {
+        font-size: 13.5px;
+        color: #CBD5E1;
+        margin: 0;
+        font-weight: 400;
+    }
+    .hero-badges {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .cyber-badge {
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #F8FAFC;
+        padding: 6px 13px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .cyber-badge-green {
+        background: rgba(16, 185, 129, 0.22);
+        border: 1px solid #34D399;
+        color: #A7F3D0;
+        padding: 6px 13px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    /* TIÊU ĐỀ PHÂN KHU TRONG CARD */
+    .zone-header-blue {
+        background: linear-gradient(90deg, #EFF6FF 0%, #DBEAFE 100%);
+        border-left: 5px solid #2563EB;
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        color: #1E3A8A;
+        font-weight: 700;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .zone-header-teal {
+        background: linear-gradient(90deg, #F0FDFA 0%, #CCFBF1 100%);
+        border-left: 5px solid #0D9488;
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        color: #115E59;
+        font-weight: 700;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .step-pill {
+        background: #1E3A8A;
+        color: #FFFFFF;
+        font-size: 11px;
+        padding: 2px 9px;
+        border-radius: 99px;
+        font-weight: 700;
+    }
+    .step-pill-teal {
+        background: #0F766E;
+        color: #FFFFFF;
+        font-size: 11px;
+        padding: 2px 9px;
+        border-radius: 99px;
+        font-weight: 700;
+    }
+
+    /* KHUNG CONTAINER TRẮNG NỔI BẬT */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FFFFFF !important;
+        border-radius: 14px !important;
+        border: 1px solid #CBD5E1 !important;
+        box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.07) !important;
+        padding: 6px !important;
+    }
+
+    /* LÀM NỔI BẬT KHUNG KÉO THẢ FILE (DROPZONE) */
+    section[data-testid="stFileUploaderDropzone"] {
+        background: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 100%) !important;
+        border: 2px dashed #3B82F6 !important;
+        border-radius: 12px !important;
+        padding: 18px !important;
+        transition: all 0.25s ease;
+    }
+    section[data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #1D4ED8 !important;
+        background: #DBEAFE !important;
+    }
+
+    /* 3 THẺ THỐNGNG KÊ KPI KỸ THUẬT SỐ */
+    .kpi-card {
+        background: #FFFFFF;
+        border-radius: 12px;
+        padding: 12px 16px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .kpi-blue { border-top: 4px solid #2563EB; }
+    .kpi-purple { border-top: 4px solid #7C3AED; }
+    .kpi-emerald { border-top: 4px solid #10B981; }
+    .kpi-icon {
+        font-size: 22px;
+        background: #F1F5F9;
+        width: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+    }
+    .kpi-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #64748B;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .kpi-value {
+        font-size: 15.5px;
+        font-weight: 800;
+        color: #0F172A;
+        margin-top: 2px;
+    }
+
+    /* MÀN HÌNH TERMINAL MAC-OS */
+    .terminal-wrapper {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #1E293B;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35);
+        margin-bottom: 8px;
+    }
+    .terminal-bar {
+        background: #1E293B;
+        padding: 8px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #334155;
+    }
+    .term-dots {
+        display: flex;
+        gap: 7px;
+    }
+    .dot-r { width: 11px; height: 11px; border-radius: 50%; background: #EF4444; display: inline-block; }
+    .dot-y { width: 11px; height: 11px; border-radius: 50%; background: #F59E0B; display: inline-block; }
+    .dot-g { width: 11px; height: 11px; border-radius: 50%; background: #10B981; display: inline-block; }
+    .term-title {
+        color: #94A3B8;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+        font-weight: 600;
+    }
+    .log-container {
+        background-color: #090D16;
+        color: #34D399;
+        font-family: 'JetBrains Mono', monospace;
+        padding: 14px 16px;
+        height: 290px;
+        overflow-y: auto;
+        font-size: 12.5px;
+        line-height: 1.65;
+    }
+
+    /* NÚT BẤM CHÍNH (PRIMARY BUTTON) NỔI BẬT */
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 50%, #1E40AF 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 0.65rem 1.2rem !important;
+        font-weight: 700 !important;
+        font-size: 14.5px !important;
+        letter-spacing: 0.2px !important;
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important;
+        transition: all 0.2s ease !important;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 8px 22px rgba(29, 78, 216, 0.48) !important;
+    }
+    div.stDownloadButton > button {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 0.7rem 1.2rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 2. TỪ ĐIỂN VIẾT TẮT & THUẬT NGỮ CHUẨN THACO AUTO (MẶC ĐỊNH)
+# 3. TỪ ĐIỂN VIẾT TẮT & THUẬT NGỮ CHUẨN Ô TÔ (MẶC ĐỊNH)
 # ============================================================
 DEFAULT_THACO_GLOSSARY = """BÁO CÁO PHÂN TÍCH NGUYÊN NHÂN & GIẢI PHÁP = ROOT CAUSE ANALYSIS & CORRECTIVE ACTION REPORT
 HẠNG MỤC = ITEM / SUBJECT
@@ -140,7 +405,7 @@ def parse_glossary(glossary_str: str, direction: str) -> dict:
     return dict(sorted(g.items(), key=lambda item: len(item[0]), reverse=True))
 
 # ============================================================
-# 3. ĐỒNG BỘ HAI CHIỀU VỚI GOOGLE SHEETS (CLOUD TM & GLOSSARY)
+# 4. ĐỒNG BỘ HAI CHIỀU VỚI GOOGLE SHEETS (CLOUD TM & GLOSSARY)
 # ============================================================
 def load_local_glossary() -> str:
     if os.path.exists(GLOSSARY_FILE):
@@ -245,26 +510,44 @@ if "cloud_sync_status" not in st.session_state:
     ok, msg = sync_from_gsheet(DEFAULT_GSHEET_WEBAPP_URL)
     st.session_state.cloud_sync_status = (ok, msg)
 
+def render_terminal_html(logs_list: list) -> str:
+    body = "<br>".join(logs_list[-50:]) if logs_list else (
+        "✅ <b>MASTERLUU PRO V7.0 (Digital Cockpit Edition)</b> sẵn sàng hoạt động!<br>"
+        "• <b>Bước 1</b>: Kéo thả tài liệu (.xlsx, .docx, .pptx, .pdf) vào Phân khu 01 bên trái.<br>"
+        "• <b>Bước 2</b>: Chọn chế độ ở Phân khu 02 và nhấn nút <b>Bắt đầu</b> để AI xử lý."
+    )
+    return f"""
+    <div class="terminal-wrapper">
+        <div class="terminal-bar">
+            <div class="term-dots">
+                <span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>
+            </div>
+            <div class="term-title">⚡ AI_TRANSLATION_ENGINE // LIVE_CONSOLE</div>
+            <div style="color:#10B981; font-size:11px; font-family:monospace;">● ONLINE</div>
+        </div>
+        <div class="log-container">{body}</div>
+    </div>
+    """
+
 def add_log(message: str, log_placeholder=None):
     time_str = time.strftime("%H:%M:%S")
-    st.session_state.logs.append(f"[{time_str}] {message}")
+    st.session_state.logs.append(f"<span style='color:#64748B;'>[{time_str}]</span> {message}")
     if log_placeholder is not None:
-        display_logs = "<br>".join(st.session_state.logs[-50:])
-        log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
+        log_placeholder.markdown(render_terminal_html(st.session_state.logs), unsafe_allow_html=True)
 
 # ============================================================
-# 4. KẾT NỐI AI & GỌI JSON BATCH THÔNG MINH (CHỐNG LỖI 429)
+# 5. KẾT NỐI AI & GỌI JSON BATCH THÔNG MINH (CHỐNG LỖI 429)
 # ============================================================
 def build_system_prompt(direction: str, glossary_str: str) -> str:
     dir_instruction = (
         "Translate every value in the input JSON object from Vietnamese into professional, grammatically complete automotive technical English."
         if direction == "Việt → Anh"
-        else "Translate every value in the input JSON object from English into professional, accurate automotive technical Vietnamese used at THACO AUTO."
+        else "Translate every value in the input JSON object from English into professional, accurate automotive technical Vietnamese."
     )
-    return f"""You are a senior automotive engineering and after-sales quality management translator at THACO AUTO.
+    return f"""You are a senior automotive engineering and after-sales quality management translator.
 {dir_instruction}
 
-MANDATORY THACO GLOSSARY & ABBREVIATIONS (Always follow these exact translations when encountered):
+MANDATORY GLOSSARY & ABBREVIATIONS (Always follow these exact translations when encountered):
 {glossary_str}
 
 CRITICAL TRANSLATION RULES:
@@ -350,7 +633,7 @@ def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: s
     return batch_dict
 
 # ============================================================
-# 5. BỘ LỌC NHẬN DIỆN VĂN BẢN & DỊCH KẾT HỢP CLOUD TM + GLOSSARY
+# 6. BỘ LỌC NHẬN DIỆN VĂN BẢN & DỊCH KẾT HỢP CLOUD TM + GLOSSARY
 # ============================================================
 def has_vietnamese_accents(text: str) -> bool:
     if "đ" in text.lower():
@@ -417,7 +700,7 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
         else:
             need_ai.append(s)
 
-    add_log(f"⚡ Đã lấy tức thì {tm_hits}/{len(unique_strings)} câu từ Từ điển THACO & Google Sheets TM (0.01s). Cần gọi AI: {len(need_ai)} câu.", log_placeholder)
+    add_log(f"⚡ Đã lấy tức thì {tm_hits}/{len(unique_strings)} câu từ Từ điển & Google Sheets TM (0.01s). Cần gọi AI: {len(need_ai)} câu.", log_placeholder)
 
     if not need_ai:
         progress_bar.progress(1.0)
@@ -460,7 +743,7 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
     return translated_map
 
 # ============================================================
-# 6. THUẬT TOÁN GOM CÂU THÔNG MINH (CHỐNG CẮT VỤN RUN POWERPOINT/WORD)
+# 7. THUẬT TOÁN GOM CÂU THÔNG MINH (CHỐNG CẮT VỤN RUN POWERPOINT/WORD)
 # ============================================================
 class ParagraphSegment:
     def __init__(self, runs):
@@ -517,7 +800,7 @@ def collect_paragraph_segments(paragraph, segments_list, texts_list):
         texts_list.append(seg.text)
 
 # ============================================================
-# 7. TRÍCH XUẤT & KẾT XUẤT CHO EXCEL, WORD, POWERPOINT, PDF
+# 8. TRÍCH XUẤT & KẾT XUẤT CHO EXCEL, WORD, POWERPOINT, PDF
 # ============================================================
 def sanitize_excel_sheet_title(title: str, existing_titles: list) -> str:
     cleaned = re.sub(r'[:\\/?*\[\]]', '-', title).strip()
@@ -764,12 +1047,12 @@ def apply_translations_to_file(input_path: str, output_path: str, file_ext: str,
         prs.save(output_path)
 
 # ============================================================
-# 8. THANH BÊN (SIDEBAR): CẤU HÌNH HỆ THỐNG, TỪ ĐIỂN & CLOUD TM
+# 9. THANH BÊN (SIDEBAR): CẤU HÌNH HỆ THỐNG, TỪ ĐIỂN & CLOUD TM
 # ============================================================
 with st.sidebar:
-    st.markdown("### 🛠️ Quản trị & Cấu hình")
+    st.markdown("### 🎛️ Trung tâm Điều khiển")
+    st.caption("Cấu hình lõi AI, Từ điển chuyên ngành & Đồng bộ Đám mây")
     
-    # Chọn nhanh Model AI ở đầu Sidebar
     model_list = st.session_state.get("available_models", [
         "qwen/qwen3.8-27b",
         "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -777,10 +1060,9 @@ with st.sidebar:
         "deepseek-r1-distill-llama-70b",
         "gemma2-9b-it"
     ])
-    selected_model = st.selectbox("🤖 Model AI dịch thuật:", options=model_list)
+    selected_model = st.selectbox("🤖 Động cơ Model AI:", options=model_list)
 
-    # 1. Kết nối Máy chủ & Cloud (Đóng gọn mặc định)
-    with st.expander("🔌 Kết nối Server AI & Google Sheets", expanded=False):
+    with st.expander("🔌 Kết nối Server AI & Cloud", expanded=False):
         proxy_url = st.text_input("🔗 Cloudflare Worker:", value=DEFAULT_PROXY_URL)
         gsheet_url = st.text_input("☁️ Google Sheets Web App:", value=DEFAULT_GSHEET_WEBAPP_URL)
         direct_key = st.text_input("🔑 Groq API Key (Tùy chọn):", type="password")
@@ -796,15 +1078,14 @@ with st.sidebar:
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
         with sb_c2:
-            if st.button("☁️ Đồng bộ Cloud", use_container_width=True):
+            if st.button("☁️ Đồng bộ", use_container_width=True):
                 ok, msg = sync_from_gsheet(gsheet_url)
                 st.session_state.cloud_sync_status = (ok, msg)
                 if ok: st.success(msg)
                 else: st.warning(msg)
 
-    # 2. Khung Từ viết tắt & Thuật ngữ CHUYÊN NGÀNH Ô TÔ
     g_count_now = len(glossary_str_to_dict(st.session_state.glossary_text))
-    with st.expander(f"📚 Từ điển & Viết tắt THACO ({g_count_now} từ)", expanded=False):
+    with st.expander(f"📚 Từ điển Chuyên ngành ({g_count_now} mục)", expanded=False):
         st.caption("Cú pháp: `Tiếng Việt = Tiếng Anh chuẩn`")
         new_glossary = st.text_area(
             "Danh sách thuật ngữ:",
@@ -819,19 +1100,18 @@ with st.sidebar:
             else:
                 st.info("💾 Đã lưu cục bộ.")
 
-    # 3. Khung Bộ nhớ đệm Translation Memory (TM)
-    with st.expander(f"🧠 Bộ nhớ đệm Cloud TM ({len(st.session_state.tm_data)} câu)", expanded=False):
+    with st.expander(f"🧠 Bộ nhớ Cloud TM ({len(st.session_state.tm_data)} câu)", expanded=False):
         tm_df_export = pd.DataFrame(
             [{"Khoa_Goc": k, "Ban_Dich_Chuan": v} for k, v in st.session_state.tm_data.items()]
         )
         st.download_button(
-            "⬇️ Tải file TM (.csv)",
+            "⬇️ Xuất file TM (.csv)",
             data=tm_df_export.to_csv(index=False).encode("utf-8-sig"),
-            file_name="THACO_Translation_Memory.csv",
+            file_name="Translation_Memory_Backup.csv",
             mime="text/csv",
             use_container_width=True
         )
-        if st.button("🔄 Làm mới TM từ Google Sheets", use_container_width=True):
+        if st.button("🔄 Làm mới từ Google Sheets", use_container_width=True):
             ok, msg = sync_from_gsheet(gsheet_url)
             if ok:
                 st.success(msg)
@@ -843,30 +1123,45 @@ with st.sidebar:
         st.caption(f"{'🟢' if sync_ok else '🟠'} {sync_msg}")
 
 # ============================================================
-# 9. MÀN HÌNH CHÍNH: BỐ CỤC TRỰC QUAN - UPLOAD FILE NGAY ĐẦU TRANG
+# 10. MÀN HÌNH CHÍNH: HERO BANNER + WORKSPACE ĐẲNG CẤP
 # ============================================================
-st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật AI Chuyên ngành Ô tô - MASTERLUU PRO</p>', unsafe_allow_html=True)
-st.markdown(
-    '<p class="sub-title">'
-    '<span class="badge-pro">PRO V6.1</span>'
-    '<span class="badge-cloud">☁️ Google Sheets Sync</span> '
-    'Dịch nguyên câu chống đứt từ • Từ điển chuyên ngành ô tô • Xuất Song Ngữ • Dịch Đa Chiều (Việt ⇄ Anh) • Hiệu đính Nhanh'
-    '</p>',
-    unsafe_allow_html=True
-)
+st.markdown("""
+    <div class="hero-banner">
+        <div>
+            <div class="hero-title">⚡ HỆ THỐNG DỊCH THUẬT AI CHUYÊN NGÀNH Ô TÔ — MASTERLUU PRO</div>
+            <div class="hero-sub">Nền tảng Dịch thuật Kỹ thuật Số • Bảo toàn 100% Cấu trúc Excel, Word, PowerPoint, PDF • Đồng bộ Đám mây Thời gian thực</div>
+        </div>
+        <div class="hero-badges">
+            <span class="cyber-badge">🚀 ENGINE V7.0</span>
+            <span class="cyber-badge-green">☁️ CLOUD TM ACTIVE</span>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 col_work, col_monitor = st.columns([1.15, 1.85], gap="large")
 
-# --- CỘT TRÁI: TẢI FILE LÊN NGAY ĐẦU TRANG & TÙY CHỌN DỊCH NHANH ---
+# --- CỘT TRÁI: TRẠM TIẾP NHẬN FILE & CẤU HÌNH DỊCH NHANH ---
 with col_work:
     with st.container(border=True):
-        st.markdown("##### 📂 1. Tải lên Tài liệu cần dịch")
+        st.markdown(
+            '<div class="zone-header-blue">'
+            '<span>📂 PHÂN KHU 01: TIẾP NHẬN TÀI LIỆU KỸ THUẬT</span>'
+            '<span class="step-pill">BƯỚC 1</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
         uploaded_file = st.file_uploader(
-            "Kéo thả file Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf) vào đây:",
+            "Kéo thả hoặc chọn file Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf):",
             type=["xlsx", "docx", "pptx", "pdf"]
         )
 
-        st.markdown("##### ⚙️ 2. Tùy chọn Chế độ Dịch")
+        st.markdown(
+            '<div class="zone-header-teal">'
+            '<span>⚙️ PHÂN KHU 02: THIẾT LẬP CHẾ ĐỘ XỬ LÝ AI</span>'
+            '<span class="step-pill-teal">BƯỚC 2</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
         direction = st.radio("🌐 Chiều dịch thuật:", ["Việt → Anh", "Anh → Việt"], horizontal=True)
         
         opt_c1, opt_c2 = st.columns(2)
@@ -886,14 +1181,13 @@ with col_work:
             disabled=(uploaded_file is None)
         )
         if uploaded_file is None:
-            st.caption("💡 *Hãy kéo thả hoặc chọn 1 file ở khung trên để kích hoạt nút Dịch.*")
+            st.caption("💡 *Hãy thả tài liệu vào Phân khu 01 phía trên để mở khóa nút kích hoạt AI.*")
 
-    # Hiển thị nút Tải xuống nổi bật ngay dưới khung làm việc nếu đã xử lý xong
     if st.session_state.get("final_output_bytes") is not None:
         with st.container(border=True):
-            st.success(f"🎉 Hoàn tất! File **{st.session_state.final_output_name}** đã sẵn sàng:")
+            st.success(f"🎉 Xử lý hoàn tất! Tài liệu **{st.session_state.final_output_name}** đã sẵn sàng:")
             st.download_button(
-                label=f"⬇️ TẢI XUỐNG FILE HOÀN THIỆN ({st.session_state.final_output_name})",
+                label=f"⬇️ TẢI XUỐNG TÀI LIỆU HOÀN THIỆN ({st.session_state.final_output_name})",
                 data=st.session_state.final_output_bytes,
                 file_name=st.session_state.final_output_name,
                 mime="application/octet-stream",
@@ -901,151 +1195,164 @@ with col_work:
                 use_container_width=True
             )
 
-# --- CỘT PHẢI: MÀN HÌNH GIÁM SÁT & BẢNG HIỆU ĐÍNH NHANH ---
+# --- CỘT PHẢI: 3 THẺ KPI KỸ THUẬT SỐ + TERMINAL GIÁM SÁT & BẢNG HIỆU ĐÍNH ---
 with col_monitor:
-    # Thanh trạng thái tóm tắt gọn đẹp ở đầu cột phải
-    st_c1, st_c2, st_c3 = st.columns(3)
-    with st_c1:
-        st.markdown(f"<div class='stat-box'>🤖 <b>Model:</b> {selected_model.split('/')[-1]}</div>", unsafe_allow_html=True)
-    with st_c2:
-        st.markdown(f"<div class='stat-box'>📚 <b>Thuật ngữ chuyên ngành ô tô:</b> {g_count_now} mục</div>", unsafe_allow_html=True)
-    with st_c3:
-        st.markdown(f"<div class='stat-box'>🧠 <b>Bộ nhớ Cloud TM:</b> {len(st.session_state.tm_data)} câu</div>", unsafe_allow_html=True)
+    kpi1, kpi2, kpi3 = st.columns(3)
+    with kpi1:
+        st.markdown(f"""
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-icon">🤖</div>
+                <div>
+                    <div class="kpi-label">Model AI Đang Chạy</div>
+                    <div class="kpi-value">{selected_model.split('/')[-1]}</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    with kpi2:
+        st.markdown(f"""
+            <div class="kpi-card kpi-purple">
+                <div class="kpi-icon">📚</div>
+                <div>
+                    <div class="kpi-label">Từ Điển Chuyên Ngành</div>
+                    <div class="kpi-value">{g_count_now} Thuật ngữ</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    with kpi3:
+        st.markdown(f"""
+            <div class="kpi-card kpi-emerald">
+                <div class="kpi-icon">🧠</div>
+                <div>
+                    <div class="kpi-label">Bộ Nhớ Đệm Cloud TM</div>
+                    <div class="kpi-value">{len(st.session_state.tm_data)} Câu chuẩn</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
     st.write("")
-    tab_console, tab_review = st.tabs([
-        "🖥️ Nhật ký Tiến trình (Live Console)",
-        f"✍️ Bảng Hiệu đính Nhanh ({len(st.session_state.review_df) if st.session_state.review_df is not None else 0} câu)"
-    ])
+    with st.container(border=True):
+        tab_console, tab_review = st.tabs([
+            "🖥️ TRẠM GIÁM SÁT TIẾN TRÌNH (LIVE CONSOLE)",
+            f"✍️ BẢNG HIỆU ĐÍNH TƯƠNG TÁC ({len(st.session_state.review_df) if st.session_state.review_df is not None else 0} CÂU)"
+        ])
 
-    with tab_console:
-        log_placeholder = st.empty()
-        if not st.session_state.logs:
-            log_placeholder.markdown(
-                "<div class='log-container'>✅ Hệ thống THACO AI Translator PRO V6.1 sẵn sàng!<br>"
-                "• <b>Giao diện tối ưu</b>: Tải file và bấm dịch ngay lập tức ở khung bên trái.<br>"
-                "• <b>Cấu hình nâng cao</b>: Quản lý Từ điển THACO, Cloud TM & đổi Model AI nằm gọn ở thanh menu ngoài cùng bên trái.</div>",
-                unsafe_allow_html=True
-            )
-        else:
-            display_logs = "<br>".join(st.session_state.logs[-50:])
-            log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
+        with tab_console:
+            log_placeholder = st.empty()
+            log_placeholder.markdown(render_terminal_html(st.session_state.logs), unsafe_allow_html=True)
+            progress_bar = st.progress(0.0)
 
-        progress_bar = st.progress(0.0)
-
-    # Xử lý sự kiện khi bấm nút BẮT ĐẦU DỊCH
-    if uploaded_file is not None and start_clicked:
-        st.session_state.logs = []
-        st.session_state.final_output_bytes = None
-        st.session_state.glossary_text = new_glossary
-        st.session_state.staged_file_bytes = uploaded_file.getvalue()
-        st.session_state.staged_file_name = uploaded_file.name
-        
-        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-        add_log(f"🚀 Bắt đầu xử lý '{uploaded_file.name}' | Model: {selected_model} | Chiều: {direction}", log_placeholder)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
-            tmp_in.write(st.session_state.staged_file_bytes)
-            input_path = tmp_in.name
-
-        try:
-            start_t = time.time()
-            add_log("🔍 Đang quét cấu trúc file và hợp nhất các đoạn văn bị cắt vụn...", log_placeholder)
-            unique_list = extract_all_unique_strings_from_file(input_path, file_ext, direction, translate_sheets)
+        # Xử lý sự kiện khi bấm nút BẮT ĐẦU DỊCH
+        if uploaded_file is not None and start_clicked:
+            st.session_state.logs = []
+            st.session_state.final_output_bytes = None
+            st.session_state.glossary_text = new_glossary
+            st.session_state.staged_file_bytes = uploaded_file.getvalue()
+            st.session_state.staged_file_name = uploaded_file.name
             
-            trans_map = translate_unique_list(
-                unique_list, selected_model, proxy_url, direct_key, gsheet_url,
-                direction, st.session_state.glossary_text, log_placeholder, progress_bar
-            )
-            
-            elapsed = round(time.time() - start_t, 1)
-            add_log(f"🎉 Đã dịch xong {len(unique_list)} câu duy nhất trong {elapsed} giây!", log_placeholder)
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            add_log(f"🚀 Khởi chạy dịch tài liệu <b>{uploaded_file.name}</b> | Model: <b>{selected_model}</b> | Chiều: <b>{direction}</b>", log_placeholder)
 
-            st.session_state.review_df = pd.DataFrame([
-                {"Câu gốc trong File": k, "Bản dịch AI (Bấm đúp để sửa tay)": v}
-                for k, v in trans_map.items()
-            ])
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
+                tmp_in.write(st.session_state.staged_file_bytes)
+                input_path = tmp_in.name
 
-            if enable_review:
-                add_log("👉 Mời anh chuyển sang tab '✍️ Bảng Hiệu đính Nhanh' bên cạnh để kiểm tra và xuất file!", log_placeholder)
-            else:
-                output_ext = ".docx" if file_ext == ".pdf" else file_ext
-                suffix_tag = "_Bilingual" if bilingual else ("_EN" if direction == "Việt → Anh" else "_VN")
-                output_name = uploaded_file.name.replace(file_ext, f"{suffix_tag}{output_ext}")
-                output_path = input_path.replace(file_ext, f"_out{output_ext}")
-
-                apply_translations_to_file(
-                    input_path, output_path, file_ext, trans_map,
-                    bilingual, auto_fit, translate_sheets, log_placeholder
+            try:
+                start_t = time.time()
+                add_log("🔍 Đang quét cấu trúc file và hợp nhất các đoạn văn bị cắt vụn...", log_placeholder)
+                unique_list = extract_all_unique_strings_from_file(input_path, file_ext, direction, translate_sheets)
+                
+                trans_map = translate_unique_list(
+                    unique_list, selected_model, proxy_url, direct_key, gsheet_url,
+                    direction, st.session_state.glossary_text, log_placeholder, progress_bar
                 )
-                with open(output_path, "rb") as f:
-                    st.session_state.final_output_bytes = f.read()
-                    st.session_state.final_output_name = output_name
-                if os.path.exists(output_path):
-                    os.remove(output_path)
-                st.rerun()
+                
+                elapsed = round(time.time() - start_t, 1)
+                add_log(f"🎉 Hoàn tất dịch {len(unique_list)} câu duy nhất chỉ trong <b>{elapsed} giây</b>!", log_placeholder)
 
-        except Exception as e:
-            add_log(f"❌ LỖI HỆ THỐNG: {str(e)}", log_placeholder)
-        finally:
-            if os.path.exists(input_path):
-                os.remove(input_path)
+                st.session_state.review_df = pd.DataFrame([
+                    {"Câu gốc trong File": k, "Bản dịch AI (Bấm đúp để sửa tay)": v}
+                    for k, v in trans_map.items()
+                ])
 
-    # Nội dung Tab Bảng Hiệu đính Nhanh
-    with tab_review:
-        if st.session_state.review_df is not None:
-            st.caption("Bấm đúp vào cột **'Bản dịch AI'** để sửa tay. Khi bấm Kết xuất, các câu sửa sẽ tự động lưu lên Google Sheets:")
-            edited_df = st.data_editor(
-                st.session_state.review_df,
-                use_container_width=True,
-                height=280,
-                disabled=["Câu gốc trong File"],
-                key="editor_grid"
-            )
-
-            if st.button("✅ ÁP DỤNG BẢN HIỆU ĐÍNH, LƯU CLOUD & KẾT XUẤT FILE", type="primary", use_container_width=True):
-                if st.session_state.staged_file_bytes:
-                    file_name = st.session_state.staged_file_name
-                    file_ext = os.path.splitext(file_name)[1].lower()
-                    
-                    final_map = {}
-                    changed_for_cloud = {}
-                    tm = st.session_state.tm_data
-
-                    for _, row in edited_df.iterrows():
-                        orig_s = str(row["Câu gốc trong File"]).strip()
-                        edit_s = str(row["Bản dịch AI (Bấm đúp để sửa tay)"]).strip()
-                        final_map[orig_s] = edit_s
-                        tm_k = f"{direction}::{orig_s}"
-                        if tm.get(tm_k) != edit_s:
-                            changed_for_cloud[tm_k] = edit_s
-                        tm[tm_k] = edit_s
-
-                    save_tm(tm, new_items_only=changed_for_cloud if changed_for_cloud else None, webapp_url=gsheet_url)
-                    if changed_for_cloud:
-                        add_log(f"☁️ Đã cập nhật {len(changed_for_cloud)} câu hiệu đính lên Google Sheets.", log_placeholder)
-
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
-                        tmp_in.write(st.session_state.staged_file_bytes)
-                        in_p = tmp_in.name
-
+                if enable_review:
+                    add_log("👉 Mời anh bấm sang tab <b>'✍️ BẢNG HIỆU ĐÍNH TƯƠNG TÁC'</b> bên cạnh để duyệt và xuất file!", log_placeholder)
+                else:
                     output_ext = ".docx" if file_ext == ".pdf" else file_ext
                     suffix_tag = "_Bilingual" if bilingual else ("_EN" if direction == "Việt → Anh" else "_VN")
-                    output_name = file_name.replace(file_ext, f"{suffix_tag}{output_ext}")
-                    out_p = in_p.replace(file_ext, f"_out{output_ext}")
+                    output_name = uploaded_file.name.replace(file_ext, f"{suffix_tag}{output_ext}")
+                    output_path = input_path.replace(file_ext, f"_out{output_ext}")
 
-                    try:
-                        apply_translations_to_file(
-                            in_p, out_p, file_ext, final_map,
-                            bilingual, auto_fit, translate_sheets, log_placeholder
-                        )
-                        with open(out_p, "rb") as f:
-                            st.session_state.final_output_bytes = f.read()
-                            st.session_state.final_output_name = output_name
-                        add_log(f"✅ Đã kết xuất thành công file '{output_name}'!", log_placeholder)
-                        st.rerun()
-                    finally:
-                        if os.path.exists(in_p): os.remove(in_p)
-                        if os.path.exists(out_p): os.remove(out_p)
-        else:
-            st.info("📋 Bảng hiệu đính sẽ xuất hiện tại đây ngay sau khi anh tải file lên và bấm nút **Bắt đầu Phân tích & Dịch nháp**.")
+                    apply_translations_to_file(
+                        input_path, output_path, file_ext, trans_map,
+                        bilingual, auto_fit, translate_sheets, log_placeholder
+                    )
+                    with open(output_path, "rb") as f:
+                        st.session_state.final_output_bytes = f.read()
+                        st.session_state.final_output_name = output_name
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
+                    st.rerun()
+
+            except Exception as e:
+                add_log(f"❌ LỖI HỆ THỐNG: {str(e)}", log_placeholder)
+            finally:
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+
+        with tab_review:
+            if st.session_state.review_df is not None:
+                st.caption("Bấm đúp vào cột **'Bản dịch AI'** để chỉnh sửa trực tiếp. Hệ thống sẽ tự động cập nhật câu sửa lên Google Sheets Cloud TM:")
+                edited_df = st.data_editor(
+                    st.session_state.review_df,
+                    use_container_width=True,
+                    height=290,
+                    disabled=["Câu gốc trong File"],
+                    key="editor_grid"
+                )
+
+                if st.button("✅ ÁP DỤNG BẢN HIỆU ĐÍNH, ĐỒNG BỘ CLOUD & KẾT XUẤT FILE", type="primary", use_container_width=True):
+                    if st.session_state.staged_file_bytes:
+                        file_name = st.session_state.staged_file_name
+                        file_ext = os.path.splitext(file_name)[1].lower()
+                        
+                        final_map = {}
+                        changed_for_cloud = {}
+                        tm = st.session_state.tm_data
+
+                        for _, row in edited_df.iterrows():
+                            orig_s = str(row["Câu gốc trong File"]).strip()
+                            edit_s = str(row["Bản dịch AI (Bấm đúp để sửa tay)"]).strip()
+                            final_map[orig_s] = edit_s
+                            tm_k = f"{direction}::{orig_s}"
+                            if tm.get(tm_k) != edit_s:
+                                changed_for_cloud[tm_k] = edit_s
+                            tm[tm_k] = edit_s
+
+                        save_tm(tm, new_items_only=changed_for_cloud if changed_for_cloud else None, webapp_url=gsheet_url)
+                        if changed_for_cloud:
+                            add_log(f"☁️ Đã cập nhật {len(changed_for_cloud)} câu hiệu đính lên Google Sheets.", log_placeholder)
+
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
+                            tmp_in.write(st.session_state.staged_file_bytes)
+                            in_p = tmp_in.name
+
+                        output_ext = ".docx" if file_ext == ".pdf" else file_ext
+                        suffix_tag = "_Bilingual" if bilingual else ("_EN" if direction == "Việt → Anh" else "_VN")
+                        output_name = file_name.replace(file_ext, f"{suffix_tag}{output_ext}")
+                        out_p = in_p.replace(file_ext, f"_out{output_ext}")
+
+                        try:
+                            apply_translations_to_file(
+                                in_p, out_p, file_ext, final_map,
+                                bilingual, auto_fit, translate_sheets, log_placeholder
+                            )
+                            with open(out_p, "rb") as f:
+                                st.session_state.final_output_bytes = f.read()
+                                st.session_state.final_output_name = output_name
+                            add_log(f"✅ Đã kết xuất thành công file <b>{output_name}</b>!", log_placeholder)
+                            st.rerun()
+                        finally:
+                            if os.path.exists(in_p): os.remove(in_p)
+                            if os.path.exists(out_p): os.remove(out_p)
+            else:
+                st.info("📋 Bảng hiệu đính tương tác sẽ hiển thị tại đây ngay sau khi anh tải file lên và nhấn nút **Bắt đầu Phân tích & Dịch nháp**.")
