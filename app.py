@@ -25,7 +25,7 @@ from pptx import Presentation
 DEFAULT_PROXY_URL = "https://mrluu-groq-proxy.mrscong4.workers.dev"
 TM_FILE_PATH = "thaco_translation_memory.json"
 
-st.set_page_config(page_title="MrLuu AI Technical Translator Pro", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="THACO AI Technical Translator Pro", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
