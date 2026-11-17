@@ -1,6 +1,7 @@
 # app.py
-# Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO (Bản Chuẩn Python 3.14)
-# HOÀN TOÀN KHÔNG DÙNG thư viện pptx hay pandas - Chạy 100% với thư viện sẵn có
+# Hệ thống Dịch thuật Kỹ thuật bằng AI (Groq LLM qua Cloudflare Proxy)
+# Hỗ trợ: Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)
+# Cơ chế JSON Batching: Dịch 25-30 ô/lần gọi AI - Chuẩn thuật ngữ Ô tô & THACO
 
 import streamlit as st
 import requests
@@ -9,104 +10,70 @@ import time
 import os
 import tempfile
 import re
-import zipfile
-import xml.etree.ElementTree as ET
 
+# ----- Thư viện xử lý File -----
 from docx import Document
 import openpyxl
-from openpyxl.styles import Alignment
 from pdf2docx import Converter
+from pptx import Presentation
 
 # ============================================================
-# 1. CẤU HÌNH MẶC ĐỊNH & GIAO DIỆN
+# 1. CẤU HÌNH ĐƯỜNG DẪN CLOUDFLARE WORKER CỦA ANH
 # ============================================================
 DEFAULT_PROXY_URL = "https://mrluu-groq-proxy.mrscong4.workers.dev"
-TM_FILE_PATH = "thaco_translation_memory.json"
 
-st.set_page_config(page_title="THACO AI Technical Translator Pro", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="THACO AI Technical Translator", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
-    .main-title { font-size: 32px !important; font-weight: 700; color: #1E3A8A; margin-bottom: 0px; }
-    .sub-title { font-size: 15px; color: #64748B; margin-bottom: 15px; }
-    .log-container { background-color: #0F172A; color: #10B981; font-family: 'Courier New', monospace; padding: 14px; border-radius: 8px; height: 320px; overflow-y: auto; font-size: 13px; line-height: 1.5; }
+    .main-title { font-size: 34px !important; font-weight: 700; color: #1E3A8A; margin-bottom: 0px; }
+    .sub-title { font-size: 15px; color: #64748B; margin-bottom: 20px; }
+    .log-container { background-color: #0F172A; color: #10B981; font-family: 'Courier New', monospace; padding: 15px; border-radius: 8px; height: 380px; overflow-y: auto; font-size: 13px; line-height: 1.6; }
     </style>
 """, unsafe_allow_html=True)
 
-if "logs" not in st.session_state:
-    st.session_state.logs = []
-if "translation_memory" not in st.session_state:
-    if os.path.exists(TM_FILE_PATH):
-        try:
-            with open(TM_FILE_PATH, "r", encoding="utf-8") as f:
-                st.session_state.translation_memory = json.load(f)
-        except Exception:
-            st.session_state.translation_memory = {}
-    else:
-        st.session_state.translation_memory = {}
-if "review_rows" not in st.session_state:
-    st.session_state.review_rows = []
-if "file_bytes" not in st.session_state:
-    st.session_state.file_bytes = None
-if "file_name" not in st.session_state:
-    st.session_state.file_name = None
-if "translation_done" not in st.session_state:
-    st.session_state.translation_done = False
-
-def save_tm_to_disk():
-    try:
-        with open(TM_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(st.session_state.translation_memory, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
-def add_log(message: str, log_placeholder=None):
-    time_str = time.strftime("%H:%M:%S")
-    st.session_state.logs.append(f"[{time_str}] {message}")
-    if log_placeholder is not None:
-        display_logs = "<br>".join(st.session_state.logs[-45:])
-        log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
-
 # ============================================================
-# 2. SYSTEM PROMPT ĐA CHIỀU (VIỆT <-> ANH) CHUẨN THACO
+# 2. SYSTEM PROMPT CHUYÊN SÂU CHO AI (NGỮ CẢNH THACO & BJM)
 # ============================================================
-def get_system_prompt(direction: str) -> str:
-    if direction == "Việt → Anh (VI → EN)":
-        return """You are an expert automotive and after-sales quality management translator at THACO AUTO.
+SYSTEM_PROMPT = """You are an expert automotive and after-sales quality management translator at THACO AUTO.
 Translate the values in the provided JSON object from Vietnamese into professional, accurate English.
 
 CRITICAL RULES:
-1. Context: Automotive manufacturing, passenger cars, trucks, buses, spare parts, warranty claims, 8D reports, PFMEA, IATF 16949, and international shipping (e.g., partner BJM).
-2. Standard THACO terminology:
-   - "STT" -> "No.", "Số BCKT" -> "Technical Report No.", "BCKT" -> "Technical Report"
-   - "Hình thức vận chuyển" -> "Shipping Method", "BJM xách tay" -> "Hand-carried by BJM"
-   - "Chưa có báo cáo" -> "No report yet", "Mã linh kiện" / "Mã vật tư" -> "Part Number"
-   - "Tên linh kiện" / "Tên vật tư" -> "Part Name", "Tên tiếng anh" -> "English Name"
-   - "Số lượng" / "SL" -> "Quantity", "ĐVT" -> "Unit" ("Cái" -> "Pcs", "Bộ" -> "Set", "Ống" -> "Pipe/Hose")
-   - "Dài-rộng-cao (mm)" -> "L-W-H (mm)", "Cân nặng (kg)" -> "Weight (kg)", "Tổng" -> "Total"
+1. Context: Automotive spare parts, bus/truck components, warranty claims, quality inspection, executive presentations, and international shipping (e.g., partner BJM).
+2. Domain terminology examples (for context understanding, adapt naturally to any technical phrase):
+   - "STT" -> "No."
+   - "Số BCKT" -> "Technical Report No."
+   - "Hình thức vận chuyển" -> "Shipping Method"
+   - "BJM xách tay" -> "Hand-carried by BJM"
+   - "Xách tay/ hoặc gửi theo lô hàng xuất khẩu..." -> "Hand-carried / or shipped with export batch on..."
+   - "Chưa có báo cáo" -> "No report yet"
+   - "Mã linh kiện" / "Mã vật tư" -> "Part Number"
+   - "Tên linh kiện" / "Tên vật tư" -> "Part Name"
+   - "Tên tiếng anh" -> "English Name"
+   - "Số lượng" -> "Quantity"
+   - "ĐVT" -> "Unit" ("Cái" -> "Pcs", "Bộ" -> "Set", "Ống" -> "Pipe/Hose")
+   - "Dài-rộng-cao (mm)" -> "L-W-H (mm)"
+   - "Cân nặng (kg)" -> "Weight (kg)"
+   - "Tổng" -> "Total"
    - Technical parts: "Sacvo ly hợp" -> "Clutch Servo", "Càng đẩy bi T" -> "Clutch Release Fork", "Bạc đạn bi T" -> "Clutch Release Bearing", "Bộ truyền động puly quạt gió" -> "Fan Pulley Drive Assembly", "Ống dẫn nước làm mát" -> "Coolant Hose".
 3. Keep part codes, model numbers (e.g., 1005P320, CNA6128Y-1312010, JS 24V, LH, RH), and dates intact.
-4. If a phrase is ALREADY in correct English, keep it unchanged.
-5. OUTPUT FORMAT: Return ONLY a valid JSON object with the EXACT same keys ("0", "1", ...) mapped to their translated English strings. No markdown, no explanations."""
-    else:
-        return """You are an expert automotive and after-sales quality management translator at THACO AUTO.
-Translate the values in the provided JSON object from English into professional, accurate Vietnamese used in Vietnam's automotive industry.
-
-CRITICAL RULES:
-1. Context: Automotive engineering, spare parts, warranty claims, 8D/5-Why root cause analysis, quality inspection at THACO AUTO.
-2. Standard THACO terminology:
-   - "No." -> "STT", "Technical Report No." -> "Số BCKT", "Part Number" -> "Mã linh kiện"
-   - "Part Name" -> "Tên linh kiện", "Quantity" / "Qty" -> "Số lượng", "Unit" -> "ĐVT" ("Pcs" -> "Cái", "Set" -> "Bộ")
-   - "Root Cause" -> "Nguyên nhân gốc rễ", "Corrective Action" -> "Hành động khắc phục", "Preventive Action" -> "Hành động phòng ngừa"
-   - "Clutch Servo" -> "Sacvo ly hợp", "Clutch Release Fork" -> "Càng đẩy bi T", "Clutch Release Bearing" -> "Bạc đạn bi T", "Coolant Hose" -> "Ống dẫn nước làm mát".
-3. Keep part numbers, vehicle codes (CKD, CBU, LH, RH), and numbers intact.
-4. If a phrase is ALREADY in Vietnamese, keep it unchanged.
-5. OUTPUT FORMAT: Return ONLY a valid JSON object with the EXACT same keys ("0", "1", ...) mapped to their translated Vietnamese strings. No markdown, no explanations."""
+4. If a phrase is ALREADY in correct English (e.g., "LH Headlamp Module", "Clutch Servo"), keep it unchanged.
+5. OUTPUT FORMAT: Return ONLY a valid JSON object with the EXACT same keys ("0", "1", "2", ...) mapped to their translated English strings. Do NOT add markdown blocks, explanations, or extra text."""
 
 # ============================================================
-# 3. KẾT NỐI AI & BỘ LỌC NHẬN DIỆN THÔNG MINH
+# 3. HÀM KẾT NỐI CLOUDFLARE & TỰ ĐỘNG LẤY MODEL SỐNG
 # ============================================================
+if "logs" not in st.session_state:
+    st.session_state.logs = []
+
+def add_log(message: str, log_placeholder):
+    time_str = time.strftime("%H:%M:%S")
+    st.session_state.logs.append(f"[{time_str}] {message}")
+    display_logs = "<br>".join(st.session_state.logs[-45:])
+    log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
+
 def fetch_live_chat_models(proxy_url: str, direct_key: str = ""):
+    """Lấy danh sách các model Chat thực sự đang hoạt động trên Groq"""
     url = f"{proxy_url.rstrip('/')}/openai/v1/models" if not direct_key else "https://api.groq.com/openai/v1/models"
     headers = {"Content-Type": "application/json"}
     if direct_key:
@@ -114,49 +81,32 @@ def fetch_live_chat_models(proxy_url: str, direct_key: str = ""):
         
     resp = requests.get(url, headers=headers, timeout=15)
     if resp.status_code != 200:
-        raise Exception(f"HTTP {resp.status_code}: {resp.text[:150]}")
+        raise Exception(f"HTTP {resp.status_code}: {resp.text}")
         
     data = resp.json().get("data", [])
     all_ids = [m["id"] for m in data if m.get("active", True)]
-    exclude_kw = ["whisper", "guard", "orpheus", "tts", "vision", "embed", "tool", "playai"]
-    chat_models = [m for m in all_ids if not any(ex in m.lower() for ex in exclude_kw)]
     
+    # Loại bỏ các model âm thanh (whisper/orpheus), bảo vệ (guard), nhúng (embed) hoặc vision
+    exclude_keywords = ["whisper", "guard", "orpheus", "tts", "vision", "embed", " tool", "playai"]
+    chat_models = [
+        m for m in all_ids 
+        if not any(ex in m.lower() for ex in exclude_keywords)
+    ]
+    
+    # Sắp xếp ưu tiên các model lớn và thông minh lên đầu
     def sort_key(m_name):
         name = m_name.lower()
-        if "qwen" in name: return 0
-        if "70b" in name: return 1
-        if "llama-4" in name or "deepseek" in name: return 2
-        return 3
+        if "qwen" in name or "70b" in name: return 0
+        if "deepseek" in name or "llama-4" in name: return 1
+        if "gemma" in name or "mixtral" in name: return 2
+        if "8b" in name: return 3
+        return 4
         
     chat_models.sort(key=sort_key)
     return chat_models
 
-def is_part_code_or_number(t: str) -> bool:
-    if re.match(r'^[\d\s.,\-+/&:()]+$', t):
-        return True
-    if " " not in t and any(c.isdigit() for c in t) and re.match(r'^[A-Za-z0-9\-_./]+$', t):
-        return True
-    return False
-
-def should_translate(text: str, direction: str) -> bool:
-    t = text.strip()
-    if not t or t.startswith("=") or is_part_code_or_number(t):
-        return False
-    if not re.search(r'[A-Za-zÀ-ỹ]', t):
-        return False
-
-    if direction == "Việt → Anh (VI → EN)":
-        if re.search(r'[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]', t):
-            return True
-        if t.upper() in ["STT", "SL", "TONG", "DVT", "BCKT"]:
-            return True
-        return False
-    else:
-        if t.upper() in ["LH", "RH", "ID", "OK", "VIN", "CKD", "CBU"]:
-            return False
-        return True
-
-def call_ai_batch(batch_dict: dict, model_id: str, direction: str, proxy_url: str, direct_key: str, log_placeholder) -> dict:
+def call_ai_batch(batch_dict: dict, model_id: str, proxy_url: str, direct_key: str, log_placeholder) -> dict:
+    """Gửi cả cụm 25-30 câu lên AI dịch trong 1 lần duy nhất bằng định dạng JSON"""
     url = f"{proxy_url.rstrip('/')}/openai/v1/chat/completions" if not direct_key else "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     if direct_key:
@@ -165,7 +115,7 @@ def call_ai_batch(batch_dict: dict, model_id: str, direction: str, proxy_url: st
     payload = {
         "model": model_id,
         "messages": [
-            {"role": "system", "content": get_system_prompt(direction)},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": json.dumps(batch_dict, ensure_ascii=False)}
         ],
         "temperature": 0.1,
@@ -174,428 +124,312 @@ def call_ai_batch(batch_dict: dict, model_id: str, direction: str, proxy_url: st
 
     for attempt in range(3):
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=50)
+            resp = requests.post(url, headers=headers, json=payload, timeout=45)
+            # Nếu model không hỗ trợ ép kiểu json_object thì bỏ tham số đó đi và gọi lại
             if resp.status_code == 400 and "response_format" in resp.text:
                 payload.pop("response_format", None)
-                resp = requests.post(url, headers=headers, json=payload, timeout=50)
+                resp = requests.post(url, headers=headers, json=payload, timeout=45)
 
             if resp.status_code == 429:
-                add_log("⚠️ Chạm giới hạn tốc độ (429), chờ 5 giây...", log_placeholder)
-                time.sleep(5)
+                add_log("⚠️ Chạm giới hạn tốc độ (429), đang chờ 6 giây...", log_placeholder)
+                time.sleep(6)
                 continue
 
             if resp.status_code != 200:
-                raise Exception(f"HTTP {resp.status_code}: {resp.text[:150]}")
+                raise Exception(f"HTTP {resp.status_code} - {resp.text[:200]}")
 
             content = resp.json()["choices"][0]["message"]["content"].strip()
+            # Xử lý trường hợp model có thẻ <think>...</think> (như Qwen/DeepSeek) trước khi lấy JSON
             content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
                 content = json_match.group(0)
             return json.loads(content)
 
         except Exception as e:
-            add_log(f"⚠️ Thử lại lần {attempt + 1} ({str(e)})...", log_placeholder)
+            add_log(f"⚠️ Thử lại lần {attempt + 1} do lỗi: {str(e)}", log_placeholder)
             time.sleep(2)
 
-    add_log("❌ Lô này gặp sự cố mạng, giữ nguyên văn bản gốc.", log_placeholder)
+    add_log("❌ Không thể dịch cụm này sau 3 lần thử, giữ nguyên văn bản gốc.", log_placeholder)
     return batch_dict
 
 # ============================================================
-# 4. QUÉT FILE (EXCEL, WORD, PDF, POWERPOINT BẰNG XML GỐC)
+# 4. LOGIC LỌC & DỊCH FILE GIỮ NGUYÊN ĐỊNH DẠNG
 # ============================================================
-def collect_docx_texts(doc, out_list: list):
-    for p in doc.paragraphs:
-        for r in p.runs:
-            if r.text and r.text.strip():
-                out_list.append(r.text.strip())
-    for t in doc.tables:
-        for row in t.rows:
-            for cell in row.cells:
-                for p in cell.paragraphs:
-                    for r in p.runs:
-                        if r.text and r.text.strip():
-                            out_list.append(r.text.strip())
-    for txbx in doc.element.body.iter():
-        if txbx.tag.endswith('txbxContent'):
-            for p_elem in txbx.iter():
-                if p_elem.tag.endswith('t') and p_elem.text and p_elem.text.strip():
-                    out_list.append(p_elem.text.strip())
+def should_translate(text: str) -> bool:
+    """Chỉ bỏ qua số thuần túy, công thức Excel hoặc mã phụ tùng thuần túy (VD: 1005P320, CNA6128Y-1312010)"""
+    t = text.strip()
+    if not t or t.startswith("="):
+        return False
+    # Nếu có bất kỳ chữ cái tiếng Việt có dấu nào -> CHẮC CHẮN PHẢI DỊCH
+    if re.search(r'[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]', t):
+        return True
+    # Những từ viết tắt không dấu tiếng Việt cần dịch
+    if t.upper() in ["STT", "SL", "TONG"]:
+        return True
+    # Nếu chỉ gồm chữ in hoa, số, dấu gạch ngang/chấm/chéo (Mã phụ tùng, kích thước 390-275-225, ngày tháng) -> Bỏ qua
+    if re.match(r'^[A-Z0-9\-_./&\s()]+$', t):
+        return False
+    return True
 
-def collect_pptx_xml_texts(input_path: str, out_list: list):
-    """Đọc trực tiếp slide PowerPoint bằng thư viện zipfile & xml có sẵn của Python"""
-    with zipfile.ZipFile(input_path, 'r') as zf:
-        for fname in zf.namelist():
-            if fname.startswith("ppt/slides/slide") and fname.endswith(".xml"):
-                xml_bytes = zf.read(fname)
-                root = ET.fromstring(xml_bytes)
-                for elem in root.iter():
-                    if elem.tag.endswith('}t') and elem.text and elem.text.strip():
-                        out_list.append(elem.text.strip())
+def translate_all_strings(texts: list, model_id: str, proxy_url: str, direct_key: str, log_placeholder, progress_bar) -> list:
+    results = list(texts)
+    
+    # Gom các chuỗi trùng nhau (Deduplication) để tiết kiệm 50% lượng gọi AI và đồng nhất từ vựng
+    unique_map = {} # clean_text -> list of original indices
+    for idx, raw_text in enumerate(texts):
+        if should_translate(raw_text):
+            clean = raw_text.strip()
+            unique_map.setdefault(clean, []).append(idx)
 
-def extract_unique_strings_from_file(input_path: str, file_ext: str, direction: str, translate_sheets: bool) -> list:
-    raw_candidates = []
-    if file_ext == ".xlsx":
-        wb = openpyxl.load_workbook(input_path)
-        for ws in wb.worksheets:
-            if translate_sheets and ws.title:
-                raw_candidates.append(ws.title.strip())
-            for row in ws.iter_rows():
-                for cell in row:
-                    if isinstance(cell.value, str) and cell.value.strip():
-                        raw_candidates.append(cell.value.strip())
-    elif file_ext == ".docx":
-        doc = Document(input_path)
-        collect_docx_texts(doc, raw_candidates)
-    elif file_ext == ".pdf":
-        temp_docx = input_path.replace(".pdf", "_scan.docx")
-        cv = Converter(input_path)
-        cv.convert(temp_docx)
-        cv.close()
-        doc = Document(temp_docx)
-        collect_docx_texts(doc, raw_candidates)
-        if os.path.exists(temp_docx):
-            os.remove(temp_docx)
-    elif file_ext == ".pptx":
-        collect_pptx_xml_texts(input_path, raw_candidates)
+    unique_strings = list(unique_map.keys())
+    total_unique = len(unique_strings)
+    add_log(f"🔍 Phát hiện {len(texts)} thành phần văn bản -> Lọc ra {total_unique} câu/cụm từ duy nhất cần AI dịch.", log_placeholder)
 
-    seen = set()
-    unique_valid = []
-    for s in raw_candidates:
-        if s not in seen and should_translate(s, direction):
-            seen.add(s)
-            unique_valid.append(s)
-    return unique_valid
-
-def build_translation_map(unique_strings: list, model_id: str, direction: str, proxy_url: str, direct_key: str, use_tm: bool, log_placeholder, progress_bar) -> dict:
-    trans_map = {}
-    to_ask_ai = []
-    tm_dict = st.session_state.translation_memory
-
-    for s in unique_strings:
-        tm_key = f"{direction}||{s}"
-        if use_tm and tm_key in tm_dict:
-            trans_map[s] = tm_dict[tm_key]
-        else:
-            to_ask_ai.append(s)
-
-    tm_hits = len(unique_strings) - len(to_ask_ai)
-    if tm_hits > 0:
-        add_log(f"⚡ Lấy tức thì {tm_hits}/{len(unique_strings)} cụm từ từ Bộ nhớ dịch thuật (TM).", log_placeholder)
-
-    total_ai = len(to_ask_ai)
-    if total_ai == 0:
+    if total_unique == 0:
         progress_bar.progress(1.0)
-        return trans_map
+        return results
 
-    add_log(f"🤖 Cần gửi AI dịch {total_ai} cụm từ mới...", log_placeholder)
+    # Chia thành từng lô 25 câu để gửi AI
     BATCH_SIZE = 25
-    for start_idx in range(0, total_ai, BATCH_SIZE):
-        batch_slice = to_ask_ai[start_idx : start_idx + BATCH_SIZE]
+    translated_unique = {}
+    
+    for start_idx in range(0, total_unique, BATCH_SIZE):
+        batch_slice = unique_strings[start_idx : start_idx + BATCH_SIZE]
         batch_payload = {str(i): s for i, s in enumerate(batch_slice)}
         
-        preview = ", ".join([f"'{x[:18]}'" for x in batch_slice[:3]])
-        add_log(f"🚀 Đang dịch lô {start_idx + 1} -> {start_idx + len(batch_slice)} ({preview}...)", log_placeholder)
+        sample_preview = ", ".join([f"'{s[:20]}'" for s in batch_slice[:3]])
+        add_log(f"🤖 Đang gửi AI ({model_id}) dịch lô {start_idx + 1} -> {start_idx + len(batch_slice)} ({sample_preview}...)", log_placeholder)
         
-        ai_resp = call_ai_batch(batch_payload, model_id, direction, proxy_url, direct_key, log_placeholder)
+        ai_response = call_ai_batch(batch_payload, model_id, proxy_url, direct_key, log_placeholder)
         
-        for i, orig_str in enumerate(batch_slice):
-            val = ai_resp.get(str(i), orig_str)
-            clean_val = val.strip() if isinstance(val, str) and val.strip() else orig_str
-            trans_map[orig_str] = clean_val
-            st.session_state.translation_memory[f"{direction}||{orig_str}"] = clean_val
+        for i, original_clean in enumerate(batch_slice):
+            trans_val = ai_response.get(str(i), original_clean)
+            if not isinstance(trans_val, str) or not trans_val.strip():
+                trans_val = original_clean
+            translated_unique[original_clean] = trans_val.strip()
             
-        progress_bar.progress(min((start_idx + len(batch_slice)) / total_ai, 1.0))
-        time.sleep(0.8)
+        progress_bar.progress(min((start_idx + len(batch_slice)) / total_unique, 1.0))
+        time.sleep(1.0) # Nghỉ nhẹ 1s giữa các lô
 
-    save_tm_to_disk()
-    return trans_map
+    # Điền trả lại vào đúng vị trí các ô ban đầu (giữ nguyên khoảng trắng đầu/cuối nếu có)
+    for clean_str, indices in unique_map.items():
+        trans_str = translated_unique.get(clean_str, clean_str)
+        for idx in indices:
+            orig = texts[idx]
+            lead = orig[:len(orig) - len(orig.lstrip())]
+            trail = orig[len(orig.rstrip()):]
+            results[idx] = lead + trans_str + trail
+
+    return results
 
 # ============================================================
-# 5. KẾT XUẤT FILE HOÀN THIỆN
+# 5. CÁC HÀM XỬ LÝ FILE (EXCEL, WORD, POWERPOINT, PDF)
 # ============================================================
-def format_final_text(original_raw: str, trans_map: dict, bilingual: bool) -> str:
-    clean = original_raw.strip()
-    if clean not in trans_map:
-        return original_raw
-    translated = trans_map[clean]
-    lead = original_raw[:len(original_raw) - len(original_raw.lstrip())]
-    trail = original_raw[len(original_raw.rstrip()):]
-    
-    if bilingual and clean.lower() != translated.lower():
-        return f"{lead}{clean}\n({translated}){trail}"
-    return f"{lead}{translated}{trail}"
-
-def sanitize_sheet_title(title: str, existing_titles: list) -> str:
-    clean = re.sub(r'[\\/*?:\[\]]', '-', title).strip()
-    if not clean:
-        clean = "Sheet"
-    base = clean[:28]
-    candidate = clean[:31]
-    counter = 1
-    while candidate.lower() in [t.lower() for t in existing_titles]:
-        candidate = f"{base}_{counter}"
-        counter += 1
-    return candidate
-
-def apply_to_excel(input_path: str, output_path: str, trans_map: dict, bilingual: bool, translate_sheets: bool, auto_fit: bool):
+def process_excel(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
+    add_log("📂 Đang mở file Excel và quét các Sheet...", log_placeholder)
     wb = openpyxl.load_workbook(input_path)
+    cells, texts = [], []
+    
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for cell in row:
-                if isinstance(cell.value, str) and cell.value.strip() in trans_map:
-                    cell.value = format_final_text(cell.value, trans_map, bilingual)
-                    if auto_fit or bilingual:
-                        old_align = cell.alignment
-                        if old_align:
-                            cell.alignment = Alignment(
-                                horizontal=old_align.horizontal,
-                                vertical=old_align.vertical or "center",
-                                wrap_text=True
-                            )
-                        else:
-                            cell.alignment = Alignment(wrap_text=True, vertical="center")
-                            
-        if bilingual or auto_fit:
-            for row_idx in range(1, ws.max_row + 1):
-                ws.row_dimensions[row_idx].height = None
-
-    if translate_sheets:
-        used_titles = [ws.title for ws in wb.worksheets]
-        for ws in wb.worksheets:
-            orig_title = ws.title.strip()
-            if orig_title in trans_map:
-                new_raw = trans_map[orig_title]
-                other_titles = [t for t in used_titles if t != ws.title]
-                safe_title = sanitize_sheet_title(new_raw, other_titles)
-                used_titles.remove(ws.title)
-                ws.title = safe_title
-                used_titles.append(safe_title)
-
+                if isinstance(cell.value, str) and cell.value.strip():
+                    cells.append(cell)
+                    texts.append(cell.value)
+                    
+    translated = translate_all_strings(texts, model_id, proxy_url, direct_key, log_placeholder, progress_bar)
+    for cell, new_val in zip(cells, translated):
+        cell.value = new_val
+        
+    add_log("💾 Đang lưu file Excel hoàn thiện (giữ nguyên định dạng gốc)...", log_placeholder)
     wb.save(output_path)
 
-def apply_to_word(input_path: str, output_path: str, trans_map: dict, bilingual: bool):
+def process_word(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
+    add_log("📂 Đang mở file Word...", log_placeholder)
     doc = Document(input_path)
+    runs, texts = [], []
+    
     for p in doc.paragraphs:
         for r in p.runs:
-            if r.text and r.text.strip() in trans_map:
-                r.text = format_final_text(r.text, trans_map, bilingual)
+            if r.text.strip():
+                runs.append(r); texts.append(r.text)
     for t in doc.tables:
         for row in t.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
                     for r in p.runs:
-                        if r.text and r.text.strip() in trans_map:
-                            r.text = format_final_text(r.text, trans_map, bilingual)
-    for txbx in doc.element.body.iter():
-        if txbx.tag.endswith('txbxContent'):
-            for p_elem in txbx.iter():
-                if p_elem.tag.endswith('t') and p_elem.text and p_elem.text.strip() in trans_map:
-                    p_elem.text = format_final_text(p_elem.text, trans_map, bilingual)
+                        if r.text.strip():
+                            runs.append(r); texts.append(r.text)
+                            
+    translated = translate_all_strings(texts, model_id, proxy_url, direct_key, log_placeholder, progress_bar)
+    for r, new_val in zip(runs, translated):
+        r.text = new_val
+        
+    add_log("💾 Đang lưu file Word...", log_placeholder)
     doc.save(output_path)
 
-def apply_to_pptx_xml(input_path: str, output_path: str, trans_map: dict, bilingual: bool):
-    with zipfile.ZipFile(input_path, 'r') as zin:
-        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
-            for item in zin.infolist():
-                data = zin.read(item.filename)
-                if item.filename.startswith("ppt/slides/slide") and item.filename.endswith(".xml"):
-                    root = ET.fromstring(data)
-                    for elem in root.iter():
-                        if elem.tag.endswith('}t') and elem.text and elem.text.strip() in trans_map:
-                            elem.text = format_final_text(elem.text, trans_map, bilingual)
-                    data = ET.tostring(root, encoding='utf-8', xml_declaration=True)
-                zout.writestr(item, data)
+def extract_pptx_shape_runs(shape, runs_list, texts_list):
+    """Hàm đệ quy quét toàn bộ Text Frame, Bảng (Table) và Group Shapes trong PowerPoint"""
+    # 1. Nếu shape là một Group (nhóm nhiều hình lại với nhau) -> Quét đệ quy bên trong
+    if shape.shape_type == 6: # MSO_SHAPE_TYPE.GROUP
+        for sub_shape in shape.shapes:
+            extract_pptx_shape_runs(sub_shape, runs_list, texts_list)
+            
+    # 2. Nếu shape có chứa khung văn bản (Text Box, AutoShape, Title...)
+    if shape.has_text_frame:
+        for p in shape.text_frame.paragraphs:
+            for r in p.runs:
+                if r.text and r.text.strip():
+                    runs_list.append(r)
+                    texts_list.append(r.text)
+                    
+    # 3. Nếu shape là Bảng biểu (Table) trên Slide
+    if shape.has_table:
+        for row in shape.table.rows:
+            for cell in row.cells:
+                for p in cell.text_frame.paragraphs:
+                    for r in p.runs:
+                        if r.text and r.text.strip():
+                            runs_list.append(r)
+                            texts_list.append(r.text)
 
-def generate_final_output_bytes(file_bytes: bytes, file_ext: str, trans_map: dict, bilingual: bool, translate_sheets: bool, auto_fit: bool) -> bytes:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
-        tmp_in.write(file_bytes)
-        in_path = tmp_in.name
+def process_pptx(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
+    add_log("📂 Đang mở file PowerPoint và quét tất cả các Slide...", log_placeholder)
+    prs = Presentation(input_path)
+    runs, texts = [], []
+    
+    for slide_idx, slide in enumerate(prs.slides):
+        # Quét toàn bộ đối tượng trên Slide (Shape, Table, Group...)
+        for shape in slide.shapes:
+            extract_pptx_shape_runs(shape, runs, texts)
+            
+        # Quét luôn phần Ghi chú của diễn giả (Speaker Notes) nếu có
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+            for p in slide.notes_slide.notes_text_frame.paragraphs:
+                for r in p.runs:
+                    if r.text and r.text.strip():
+                        runs.append(r)
+                        texts.append(r.text)
+                        
+    add_log(f"📊 Đã quét {len(prs.slides)} Slide (gồm Textbox, Table, Group & Notes).", log_placeholder)
+    translated = translate_all_strings(texts, model_id, proxy_url, direct_key, log_placeholder, progress_bar)
+    
+    for r, new_val in zip(runs, translated):
+        r.text = new_val
+        
+    add_log("💾 Đang lưu file PowerPoint hoàn thiện (giữ nguyên 100% bố cục, màu sắc, font chữ)...", log_placeholder)
+    prs.save(output_path)
 
-    out_ext = ".docx" if file_ext == ".pdf" else file_ext
-    out_path = in_path.replace(file_ext, f"_final{out_ext}")
+def process_pdf(input_path, output_path, model_id, proxy_url, direct_key, log_placeholder, progress_bar):
+    add_log("🔄 Đang chuyển PDF sang cấu trúc Word...", log_placeholder)
+    temp_docx = input_path.replace(".pdf", "_temp.docx")
+    cv = Converter(input_path)
+    cv.convert(temp_docx)
+    cv.close()
+    progress_bar.progress(0.15)
 
-    try:
-        if file_ext == ".xlsx":
-            apply_to_excel(in_path, out_path, trans_map, bilingual, translate_sheets, auto_fit)
-        elif file_ext == ".docx":
-            apply_to_word(in_path, out_path, trans_map, bilingual)
-        elif file_ext == ".pdf":
-            temp_docx = in_path.replace(".pdf", "_temp.docx")
-            cv = Converter(in_path)
-            cv.convert(temp_docx)
-            cv.close()
-            apply_to_word(temp_docx, out_path, trans_map, bilingual)
-            if os.path.exists(temp_docx):
-                os.remove(temp_docx)
-        elif file_ext == ".pptx":
-            apply_to_pptx_xml(in_path, out_path, trans_map, bilingual)
-
-        with open(out_path, "rb") as f:
-            result_bytes = f.read()
-        return result_bytes
-    finally:
-        if os.path.exists(in_path): os.remove(in_path)
-        if os.path.exists(out_path): os.remove(out_path)
+    class ScaledPB:
+        def __init__(self, pb): self.pb = pb
+        def progress(self, val): self.pb.progress(0.15 + val * 0.85)
+        
+    process_word(temp_docx, output_path, model_id, proxy_url, direct_key, log_placeholder, ScaledPB(progress_bar))
+    if os.path.exists(temp_docx):
+        os.remove(temp_docx)
 
 # ============================================================
-# 6. GIAO DIỆN CHÍNH (ENTERPRISE UI)
+# 6. GIAO DIỆN CHÍNH
 # ============================================================
-st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO (Pro)</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Hỗ trợ Excel, Word, PowerPoint, PDF • Chế độ Song Ngữ • Hiệu đính Trực tiếp • Bộ nhớ Dịch thuật TM</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Hỗ trợ Excel, Word, PowerPoint, PDF • Dịch chuẩn ngữ cảnh Kỹ thuật & Phụ tùng • Giữ nguyên cấu trúc File</p>', unsafe_allow_html=True)
 
-col_left, col_right = st.columns([1.15, 2])
+col_left, col_right = st.columns([1.25, 2])
 
 with col_left:
-    st.markdown("#### ⚙️ 1. Kết nối & Chế độ Dịch")
+    st.markdown("### ⚙️ 1. Kết nối Máy chủ AI")
     with st.container(border=True):
         proxy_url = st.text_input("🔗 Đường dẫn Cloudflare Worker:", value=DEFAULT_PROXY_URL)
-        direct_key = st.text_input("🔑 Groq API Key trực tiếp (Tùy chọn):", type="password")
+        direct_key = st.text_input("🔑 Hoặc nhập trực tiếp Groq API Key (Tùy chọn nếu không qua Cloudflare):", type="password")
         
-        if st.button("🔄 Kiểm tra & Tải danh sách Model AI", use_container_width=True):
+        if st.button("🔄 Kiểm tra kết nối & Tải danh sách Model AI", use_container_width=True):
             try:
-                with st.spinner("Đang quét máy chủ AI..."):
+                with st.spinner("Đang lấy danh sách model đang hoạt động..."):
                     models = fetch_live_chat_models(proxy_url, direct_key)
                     st.session_state.available_models = models
-                    st.success(f"✅ Đã tải {len(models)} model AI đang hoạt động!")
+                    st.success(f"✅ Kết nối thành công! Tìm thấy {len(models)} model AI khả dụng.")
             except Exception as e:
                 st.error(f"❌ Lỗi kết nối: {str(e)}")
 
-        default_models = st.session_state.get("available_models", [
+        # Đưa qwen/qwen3.8-27b lên làm model mặc định đầu tiên
+        model_list = st.session_state.get("available_models", [
             "qwen/qwen3.8-27b",
             "meta-llama/llama-4-scout-17b-16e-instruct",
             "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "deepseek-r1-distill-llama-70b"
+            "qwen-qwq-32b",
+            "deepseek-r1-distill-llama-70b",
+            "gemma2-9b-it"
         ])
-        selected_model = st.selectbox("🤖 Chọn Model AI:", options=default_models)
-        direction = st.radio("🔄 Chiều dịch thuật:", ["Việt → Anh (VI → EN)", "Anh → Việt (EN → VI)"], horizontal=True)
+        selected_model = st.selectbox("🤖 Chọn Model AI dịch thuật:", options=model_list)
 
-    st.markdown("#### 💎 2. Tùy chọn Nâng cao (Pro Features)")
-    with st.container(border=True):
-        bilingual_mode = st.checkbox("🌐 Xuất Song Ngữ (Giữ câu gốc + Mở ngoặc bản dịch ở dòng dưới)", value=False)
-        translate_sheets = st.checkbox("📑 Tự động dịch tên Sheet Excel (Giới hạn chuẩn 31 ký tự)", value=True)
-        auto_fit_excel = st.checkbox("📐 Tự động bật Wrap Text & Giãn dòng Excel (Chống khuất chữ)", value=True)
-        enable_review = st.checkbox("✏️ Bật Bảng Hiệu đính Nhanh trước khi tải file", value=True)
-        use_tm = st.checkbox(f"🧠 Sử dụng Bộ nhớ Dịch thuật TM (Đang lưu {len(st.session_state.translation_memory)} câu)", value=True)
-        
-        col_tm1, col_tm2 = st.columns(2)
-        with col_tm1:
-            if st.session_state.translation_memory:
-                tm_json_bytes = json.dumps(st.session_state.translation_memory, ensure_ascii=False, indent=2).encode("utf-8")
-                st.download_button("💾 Tải từ điển TM", data=tm_json_bytes, file_name="THACO_TM.json", mime="application/json", use_container_width=True)
-        with col_tm2:
-            if st.button("🗑️ Xóa bộ nhớ TM", use_container_width=True):
-                st.session_state.translation_memory = {}
-                if os.path.exists(TM_FILE_PATH): os.remove(TM_FILE_PATH)
-                st.rerun()
-
-    st.markdown("#### 📂 3. Tải lên Tài liệu")
-    uploaded_file = st.file_uploader("Hỗ trợ Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)", type=["xlsx", "docx", "pptx", "pdf"])
+    st.markdown("### 📂 2. Tải lên Tài liệu")
+    uploaded_file = st.file_uploader(
+        "Kéo thả file Excel, Word, PowerPoint, PDF", 
+        type=["xlsx", "docx", "pptx", "pdf"]
+    )
 
 with col_right:
-    st.markdown("#### 🖥️ Màn hình Giám sát (Live Console)")
+    st.markdown("### 🖥️ Màn hình Giám sát (Live Console)")
     log_placeholder = st.empty()
-    display_logs = "<br>".join(st.session_state.logs[-45:]) if st.session_state.logs else (
-        "✅ Hệ thống THACO AI Translator Pro sẵn sàng!<br>"
-        "• Đã tích hợp 6 nâng cấp: PowerPoint (.pptx), Song ngữ, Đa chiều (Việt↔Anh), Hiệu đính, Translation Memory & Auto-Fit.<br>"
-        "• Tương thích 100% với Python 3.14 trên Streamlit Cloud."
+    log_placeholder.markdown(
+        "<div class='log-container'>Hệ thống AI sẵn sàng!<br>"
+        "• Đã hỗ trợ: <b>Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)</b>.<br>"
+        "👉 Hướng dẫn: Kiểm tra kết nối Model AI -> Tải file lên -> Bấm <b>Bắt đầu dịch bằng AI</b>.</div>",
+        unsafe_allow_html=True
     )
-    log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
     
     progress_bar = st.empty()
+    action_placeholder = st.empty()
 
     if uploaded_file:
-        if st.button("🚀 BẮT ĐẦU QUÉT & DỊCH BẰNG AI", type="primary", use_container_width=True):
+        if action_placeholder.button("🚀 BẮT ĐẦU DỊCH BẰNG AI", type="primary", use_container_width=True):
             st.session_state.logs = []
-            st.session_state.translation_done = False
-            st.session_state.file_bytes = uploaded_file.getvalue()
-            st.session_state.file_name = uploaded_file.name
+            add_log(f"🚀 Khởi chạy tiến trình dịch AI với model: {selected_model}", log_placeholder)
+            
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            
-            add_log(f"🚀 Bắt đầu xử lý: {uploaded_file.name} | Chiều: {direction}", log_placeholder)
-            
             with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
-                tmp_in.write(st.session_state.file_bytes)
-                tmp_path = tmp_in.name
+                tmp_in.write(uploaded_file.getbuffer())
+                input_path = tmp_in.name
+
+            output_ext = ".docx" if file_ext == ".pdf" else file_ext
+            output_name = uploaded_file.name.replace(file_ext, f"_AI_EN{output_ext}")
+            output_path = input_path.replace(file_ext, f"_out{output_ext}")
 
             try:
                 pb = progress_bar.progress(0.0)
-                start_t = time.time()
+                start_time = time.time()
                 
-                add_log("🔍 Đang quét cấu trúc tài liệu và lọc bỏ mã phụ tùng/số liệu...", log_placeholder)
-                unique_strs = extract_unique_strings_from_file(tmp_path, file_ext, direction, translate_sheets)
-                add_log(f"📊 Tìm thấy {len(unique_strs)} câu/thuật ngữ duy nhất cần dịch.", log_placeholder)
+                if file_ext == ".xlsx":
+                    process_excel(input_path, output_path, selected_model, proxy_url, direct_key, log_placeholder, pb)
+                elif file_ext == ".docx":
+                    process_word(input_path, output_path, selected_model, proxy_url, direct_key, log_placeholder, pb)
+                elif file_ext == ".pptx":
+                    process_pptx(input_path, output_path, selected_model, proxy_url, direct_key, log_placeholder, pb)
+                elif file_ext == ".pdf":
+                    process_pdf(input_path, output_path, selected_model, proxy_url, direct_key, log_placeholder, pb)
+                    
+                elapsed = round(time.time() - start_time, 1)
+                add_log(f"🎉 HOÀN TẤT 100% BẰNG AI TRONG {elapsed} GIÂY!", log_placeholder)
+                action_placeholder.empty()
                 
-                trans_map = build_translation_map(
-                    unique_strs, selected_model, direction, proxy_url, direct_key, use_tm, log_placeholder, pb
-                )
-                
-                st.session_state.review_rows = [
-                    {"Văn bản gốc": k, "Bản dịch AI (Có thể sửa trực tiếp)": v}
-                    for k, v in trans_map.items()
-                ]
-                st.session_state.translation_done = True
-                st.session_state.last_direction = direction
-                
-                elapsed = round(time.time() - start_t, 1)
-                add_log(f"🎉 Đã dịch xong toàn bộ nội dung trong {elapsed} giây! Kiểm tra bên dưới để tải file.", log_placeholder)
+                with open(output_path, "rb") as f:
+                    st.download_button(
+                        label=f"⬇️ TẢI XUỐNG FILE ĐÃ DỊCH ({output_name})",
+                        data=f, file_name=output_name, mime="application/octet-stream",
+                        type="primary", use_container_width=True
+                    )
             except Exception as e:
                 add_log(f"❌ LỖI HỆ THỐNG: {str(e)}", log_placeholder)
             finally:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-
-    if st.session_state.translation_done and st.session_state.file_bytes is not None:
-        st.markdown("---")
-        final_trans_map = {}
-        
-        if enable_review and st.session_state.review_rows:
-            st.markdown("#### ✏️ Bảng Hiệu đính Nhanh (Interactive Review)")
-            st.caption("Anh có thể chỉnh sửa trực tiếp các thuật ngữ trong khung JSON bên dưới (nếu cần) trước khi tải file:")
-            
-            # Hiển thị bảng đối chiếu rõ ràng + cho phép sửa nhanh không cần phụ thuộc pandas/pyarrow trên Python 3.14
-            current_dict = {r["Văn bản gốc"]: r["Bản dịch AI (Có thể sửa trực tiếp)"] for r in st.session_state.review_rows}
-            edited_json_str = st.text_area(
-                "Danh sách Câu gốc -> Bản dịch (Có thể sửa trực tiếp chữ bên phải dấu hai chấm):",
-                value=json.dumps(current_dict, ensure_ascii=False, indent=2),
-                height=240
-            )
-            try:
-                parsed_edits = json.loads(edited_json_str)
-                for orig_k, edited_v in parsed_edits.items():
-                    clean_v = str(edited_v).strip()
-                    final_trans_map[orig_k] = clean_v
-                    dir_key = st.session_state.get("last_direction", direction)
-                    st.session_state.translation_memory[f"{dir_key}||{orig_k}"] = clean_v
-                save_tm_to_disk()
-            except Exception:
-                st.warning("⚠️ Định dạng JSON đang bị thiếu dấu ngoặc kép, hệ thống tạm dùng bản dịch mặc định.")
-                final_trans_map = current_dict
-        else:
-            for row in st.session_state.review_rows:
-                final_trans_map[str(row["Văn bản gốc"])] = str(row["Bản dịch AI (Có thể sửa trực tiếp)"])
-
-        orig_name = st.session_state.file_name
-        f_ext = os.path.splitext(orig_name)[1].lower()
-        out_ext = ".docx" if f_ext == ".pdf" else f_ext
-        suffix_mode = "_Bilingual" if bilingual_mode else ("_EN" if "Việt → Anh" in direction else "_VI")
-        out_filename = orig_name.replace(f_ext, f"{suffix_mode}{out_ext}")
-
-        with st.spinner("Đang đóng gói định dạng file hoàn thiện..."):
-            output_bytes = generate_final_output_bytes(
-                st.session_state.file_bytes,
-                f_ext,
-                final_trans_map,
-                bilingual=bilingual_mode,
-                translate_sheets=translate_sheets,
-                auto_fit=auto_fit_excel
-            )
-
-        st.download_button(
-            label=f"⬇️ TẢI XUỐNG TÀI LIỆU HOÀN THIỆN ({out_filename})",
-            data=output_bytes,
-            file_name=out_filename,
-            mime="application/octet-stream",
-            type="primary",
-            use_container_width=True
-        )
+                if os.path.exists(input_path):
+                    os.remove(input_path)
