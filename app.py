@@ -44,7 +44,7 @@ def init_gemini(api_key: str):
     # Sử dụng gemini-1.5-flash cho tốc độ và chi phí tối ưu (free tier)
     # Có thể đổi thành "gemini-1.5-pro" nếu cần chất lượng cao hơn
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-flash-latest",
         system_instruction=SYSTEM_PROMPT,
     )
     return model
