@@ -1,5 +1,5 @@
 # app.py
-# Hệ thống Dịch thuật AI Chuyên ngành Ô tô - MR LƯU (Phiên bản Enterprise Pro)
+# Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO (Phiên bản Enterprise Pro)
 # Tích hợp 6 tính năng nâng cao: PPTX, Song ngữ, Đa chiều, Hiệu đính, Translation Memory, Auto-Fit & Shapes
 
 import streamlit as st
