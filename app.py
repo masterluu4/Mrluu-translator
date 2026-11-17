@@ -223,7 +223,7 @@ with st.sidebar:
     )
     st.markdown("---")
     st.info(
-        "**Lưu ý:** Ứng dụng sử dụng model `gemini-1.5-flash` (free tier). "
+        "**Lưu ý:** Ứng dụng sử dụng model `gemini-flash-latest` (free tier). "
         "Nếu gặp lỗi 429, vui lòng đợi vài phút rồi thử lại."
     )
 
