@@ -216,19 +216,36 @@ with col_right:
             try:
                 client = get_groq_client()
                 
-                # --- TÍNH NĂNG TỰ ĐỘNG DÒ TÌM MODEL ---
-                add_log("Đang dò tìm danh sách Model khả dụng (Chống lỗi 404/400)...", log_placeholder)
+              # --- TÍNH NĂNG TỰ ĐỘNG DÒ TÌM MODEL ---
+                add_log("Đang dò tìm danh sách Model khả dụng (Chống chọn nhầm model lạ)...", log_placeholder)
                 try:
                     available_models = [m.id for m in client.models.list().data]
-                    # Ưu tiên các model mạnh nhất, nếu không có sẽ tự lùi về model thấp hơn
-                    priorities = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
                     
-                    selected_model = next((m for m in priorities if m in available_models), available_models[0])
+                    # Danh sách các model CỐT LÕI ổn định vĩnh viễn của Groq
+                    priorities = [
+                        "llama3-70b-8192",         # Ưu tiên 1: Llama 3 70B siêu việt và cực kỳ ổn định
+                        "llama3-8b-8192",          # Ưu tiên 2: Llama 3 8B cực nhanh
+                        "mixtral-8x7b-32768",      # Ưu tiên 3: Mixtral mã nguồn mở
+                        "llama-3.3-70b-versatile"  # Ưu tiên 4: Bản mới (nếu tài khoản được mở khóa)
+                    ]
+                    
+                    # Rà soát xem tài khoản có model nào trong danh sách ưu tiên không
+                    selected_model = None
+                    for p in priorities:
+                        if p in available_models:
+                            selected_model = p
+                            break
+                            
+                    # Nếu không tìm thấy, ép dùng chốt chặn cuối cùng (model cơ bản nhất luôn sống)
+                    if not selected_model:
+                        selected_model = "llama3-8b-8192"
+                        
                     st.session_state.selected_model = selected_model
-                    add_log(f"✅ Đã kết nối tự động tới model: {selected_model}", log_placeholder)
+                    add_log(f"✅ Đã kết nối an toàn tới model: {selected_model}", log_placeholder)
                 except Exception as e:
-                    st.session_state.selected_model = "llama-3.1-8b-instant"
-                    add_log("⚠️ Chạy model dự phòng: llama-3.1-8b-instant", log_placeholder)
+                    st.session_state.selected_model = "llama3-8b-8192"
+                    add_log("⚠️ Chạy model dự phòng cơ bản: llama3-8b-8192", log_placeholder)
+                # --------------------------------------  
                 # --------------------------------------
 
                 pb = progress_bar.progress(0.0)
