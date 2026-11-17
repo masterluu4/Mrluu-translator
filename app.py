@@ -216,23 +216,20 @@ with col_right:
             try:
                 client = get_groq_client()
                 
-# --- TÍNH NĂNG TỰ ĐỘNG DÒ TÌM MODEL & PING TEST ---
-                add_log("Đang quét máy chủ Groq để tìm Model khả dụng...", log_placeholder)
+# --- TÍNH NĂNG TỰ ĐỘNG DÒ TÌM MODEL CHÍNH XÁC ---
+                add_log("Đang kiểm tra các model dịch thuật chuyên dụng...", log_placeholder)
                 try:
-                    # 1. Lấy danh sách toàn bộ model hiện có trên tài khoản của anh
-                    all_models = [m.id for m in client.models.list().data]
-                    
-                    # 2. Lọc các dòng model chính thống (Llama, Mixtral, Gemma), bỏ qua model rác/vision
-                    safe_models = [
-                        m for m in all_models 
-                        if any(k in m.lower() for k in ["llama", "mixtral", "gemma"]) 
-                        and "vision" not in m.lower()
+                    # Danh sách CHỈ chứa các model chuyên sinh văn bản/dịch thuật tốt nhất
+                    target_models = [
+                        "llama-3.3-70b-versatile",
+                        "llama-3.1-8b-instant",
+                        "mixtral-8x7b-32768",
+                        "gemma2-9b-it"
                     ]
                     
                     selected_model = None
-                    
-                    # 3. Bắn thử (Ping test) từng model. Nếu sống -> Chọn luôn. Nếu chết (400) -> Thử cái tiếp theo.
-                    for m_id in safe_models:
+                    # Bắn thử (Ping test) theo thứ tự ưu tiên
+                    for m_id in target_models:
                         try:
                             client.chat.completions.create(
                                 messages=[{"role": "user", "content": "Hi"}],
@@ -242,17 +239,18 @@ with col_right:
                             selected_model = m_id
                             break # Chốt model thành công, thoát vòng lặp
                         except Exception:
-                            continue # Nếu lỗi decommissioned, bỏ qua và thử model dưới
+                            continue # Bị lỗi (hoặc khai tử) -> Bỏ qua, thử model tiếp theo
                             
                     if not selected_model:
-                        raise Exception("Không tìm thấy model nào đang hoạt động trên tài khoản Groq của bạn.")
+                        # Chốt chặn cuối cùng nếu tất cả đều lỗi
+                        selected_model = "llama-3.1-8b-instant"
                         
                     st.session_state.selected_model = selected_model
-                    add_log(f"✅ Đã kết nối thành công tới model đang hoạt động: {selected_model}", log_placeholder)
+                    add_log(f"✅ Đã chốt model dịch thuật: {selected_model}", log_placeholder)
                 except Exception as e:
-                    add_log(f"❌ Lỗi quét model: {str(e)}", log_placeholder)
-                    st.stop() # Dừng phần mềm nếu không có model nào sống để tránh chạy lỗi
-                # -------------------------------------- 
+                    st.session_state.selected_model = "llama-3.1-8b-instant"
+                    add_log("⚠️ Chạy model mặc định: llama-3.1-8b-instant", log_placeholder)
+                # --------------------------------------
                 # --------------------------------------
 
                 pb = progress_bar.progress(0.0)
