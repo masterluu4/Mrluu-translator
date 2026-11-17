@@ -1,7 +1,5 @@
-streamlit
-requests
-pandas
-python-docx
-openpyxl
-pdf2docx
-python-pptx
+streamlit==1.41.0
+requests==2.32.3
+python-docx==1.1.2
+openpyxl==3.1.5
+pdf2docx==0.5.8
