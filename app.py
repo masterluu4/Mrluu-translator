@@ -1,7 +1,6 @@
 # app.py
-# THACO AI TECHNICAL TRANSLATOR PRO (V6.0 - GOOGLE SHEETS CLOUD EDITION)
-# Hỗ trợ: Excel (.xlsx - gồm cả Shapes/Textboxes & Tên Sheet), Word (.docx - gồm cả Textboxes), PowerPoint (.pptx), PDF (.pdf)
-# Tính năng: Đồng bộ 2 chiều Google Sheets (TM & Glossary), Dịch nguyên câu (Paragraph-level), Song ngữ, Đa chiều, Hiệu đính nhanh, Auto-Fit.
+# THACO AI TECHNICAL TRANSLATOR PRO (V6.1 - CLEAN DASHBOARD UI)
+# Giữ nguyên 100% Logic V6.0 + Tối ưu hóa Bố cục: Đưa khung Upload File lên đầu, gom Cấu hình vào Sidebar gọn gàng
 
 import streamlit as st
 import requests
@@ -34,15 +33,22 @@ DEFAULT_GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzRJD3wE4fF
 TM_FILE = "translation_memory.json"
 GLOSSARY_FILE = "thaco_glossary.txt"
 
-st.set_page_config(page_title="THACO AI Technical Translator PRO V6", page_icon="⚡", layout="wide")
+st.set_page_config(
+    page_title="MASTERLUU AI Technical Translator PRO",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 st.markdown("""
     <style>
-    .main-title { font-size: 32px !important; font-weight: 800; color: #1E3A8A; margin-bottom: 2px; }
-    .sub-title { font-size: 14px; color: #475569; margin-bottom: 16px; }
-    .log-container { background-color: #0F172A; color: #10B981; font-family: 'Courier New', monospace; padding: 14px; border-radius: 8px; height: 280px; overflow-y: auto; font-size: 12.5px; line-height: 1.55; border: 1px solid #1E293B; }
-    .badge-pro { background-color: #DBEAFE; color: #1D4ED8; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; }
-    .badge-cloud { background-color: #DCFCE7; color: #15803D; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; margin-left: 6px; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
+    .main-title { font-size: 28px !important; font-weight: 800; color: #1E3A8A; margin-bottom: 0px; }
+    .sub-title { font-size: 13.5px; color: #475569; margin-bottom: 12px; }
+    .log-container { background-color: #0F172A; color: #10B981; font-family: 'Courier New', monospace; padding: 14px; border-radius: 8px; height: 295px; overflow-y: auto; font-size: 12.5px; line-height: 1.55; border: 1px solid #1E293B; }
+    .badge-pro { background-color: #DBEAFE; color: #1D4ED8; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; }
+    .badge-cloud { background-color: #DCFCE7; color: #15803D; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; margin-left: 6px; }
+    .stat-box { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #334155; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -121,7 +127,6 @@ def glossary_str_to_dict(glossary_str: str) -> dict:
     return g
 
 def parse_glossary(glossary_str: str, direction: str) -> dict:
-    """Đọc bảng thuật ngữ theo chiều dịch (Việt->Anh hoặc Anh->Việt), sắp xếp từ cụm dài xuống ngắn"""
     g = {}
     for line in glossary_str.strip().splitlines():
         if "=" in line and not line.strip().startswith("#"):
@@ -158,7 +163,6 @@ def load_local_tm() -> dict:
     return {}
 
 def push_to_gsheet(webapp_url: str, action: str, data_dict: dict) -> bool:
-    """Đẩy dữ liệu (Thuật ngữ hoặc câu dịch TM mới) lên Google Sheets"""
     if not webapp_url or not webapp_url.strip().startswith("https://script.google.com") or not data_dict:
         return False
     try:
@@ -172,7 +176,6 @@ def push_to_gsheet(webapp_url: str, action: str, data_dict: dict) -> bool:
         return False
 
 def sync_from_gsheet(webapp_url: str):
-    """Đồng bộ hai chiều: Hút dữ liệu từ Google Sheets về App; nếu Sheet trống thì đẩy bộ mặc định THACO lên Sheet"""
     if not webapp_url or not webapp_url.strip().startswith("https://script.google.com"):
         return False, "Đường dẫn Google Apps Script không hợp lệ."
     try:
@@ -184,21 +187,17 @@ def sync_from_gsheet(webapp_url: str):
         cloud_glossary = data.get("glossary", {})
         cloud_tm = data.get("tm", {})
 
-        # 1. Xử lý Bảng thuật ngữ (Glossary)
         default_g_dict = glossary_str_to_dict(DEFAULT_THACO_GLOSSARY)
         if cloud_glossary:
-            # Gộp từ điển mặc định và từ điển trên Cloud (ưu tiên Cloud nếu trùng khóa)
             merged_g = {**default_g_dict, **cloud_glossary}
             st.session_state.glossary_text = dict_to_glossary_str(merged_g)
         else:
-            # Nếu tab Glossary trên Google Sheets đang trống -> Tự động khởi tạo bảng chuẩn THACO lên Sheet
             st.session_state.glossary_text = DEFAULT_THACO_GLOSSARY
             push_to_gsheet(webapp_url, "save_glossary", default_g_dict)
 
         with open(GLOSSARY_FILE, "w", encoding="utf-8") as f:
             f.write(st.session_state.glossary_text)
 
-        # 2. Xử lý Bộ nhớ đệm (TM)
         if cloud_tm and isinstance(cloud_tm, dict):
             st.session_state.tm_data.update(cloud_tm)
             with open(TM_FILE, "w", encoding="utf-8") as f:
@@ -206,7 +205,7 @@ def sync_from_gsheet(webapp_url: str):
 
         g_count = len(glossary_str_to_dict(st.session_state.glossary_text))
         tm_count = len(st.session_state.tm_data)
-        return True, f"Đã đồng bộ Google Sheets: {g_count} thuật ngữ THACO & {tm_count} câu nhớ đệm (TM)!"
+        return True, f"Đã đồng bộ Cloud: {g_count} thuật ngữ & {tm_count} câu TM"
     except Exception as e:
         return False, f"Không thể kết nối Google Sheets: {str(e)}"
 
@@ -229,7 +228,7 @@ def save_tm(tm: dict, new_items_only: dict = None, webapp_url: str = ""):
     if payload_data:
         push_to_gsheet(webapp_url, "upsert_tm", payload_data)
 
-# Khởi tạo Session State & Tự động kết nối Google Sheets trong lần mở đầu tiên
+# Khởi tạo Session State
 if "tm_data" not in st.session_state:
     st.session_state.tm_data = load_local_tm()
 if "glossary_text" not in st.session_state:
@@ -389,7 +388,6 @@ def should_translate(text: str, direction: str) -> bool:
         return True
 
 def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, direct_key: str, gsheet_url: str, direction: str, glossary_str: str, log_placeholder, progress_bar) -> dict:
-    """Dịch danh sách câu duy nhất: 1. Từ điển THACO -> 2. Bộ nhớ đệm Cloud TM -> 3. Gọi AI Batch & Tự động lưu lên Google Sheets"""
     tm = st.session_state.tm_data
     glossary_dict = parse_glossary(glossary_str, direction)
     
@@ -399,7 +397,6 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
 
     for s in unique_strings:
         s_clean = s.strip()
-        # 1. Khớp chính xác trong Bảng thuật ngữ THACO
         matched_glossary = None
         for k, v in glossary_dict.items():
             if s_clean.lower() == k.lower():
@@ -410,7 +407,6 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
             tm_hits += 1
             continue
 
-        # 2. Khớp trong Bộ nhớ đệm Translation Memory (TM)
         tm_key = f"{direction}::{s_clean}"
         if tm_key in tm and str(tm[tm_key]).strip():
             translated_map[s] = str(tm[tm_key]).strip()
@@ -427,7 +423,6 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
         progress_bar.progress(1.0)
         return translated_map
 
-    # 3. Chia lô 18 câu nguyên vẹn để gửi AI
     BATCH_SIZE = 18
     total_ai = len(need_ai)
     newly_translated_for_cloud = {}
@@ -454,7 +449,6 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
             else:
                 translated_map[orig_str] = orig_str
 
-        # Lưu cục bộ và đẩy lô mới lên Google Sheets
         save_tm(tm, new_items_only=batch_new_tm, webapp_url=gsheet_url)
         progress_bar.progress(min((start + len(batch_slice)) / total_ai, 1.0))
         if start + BATCH_SIZE < total_ai:
@@ -469,7 +463,6 @@ def translate_unique_list(unique_strings: list, model_id: str, proxy_url: str, d
 # 6. THUẬT TOÁN GOM CÂU THÔNG MINH (CHỐNG CẮT VỤN RUN POWERPOINT/WORD)
 # ============================================================
 class ParagraphSegment:
-    """Gom nhóm các run liên tiếp trong 1 Paragraph thành 1 câu nguyên vẹn, bảo toàn Font/Size/Color/Bold"""
     def __init__(self, runs):
         self.runs = runs
         self.text = "".join(r.text for r in runs if r.text)
@@ -771,260 +764,288 @@ def apply_translations_to_file(input_path: str, output_path: str, file_ext: str,
         prs.save(output_path)
 
 # ============================================================
-# 8. GIAO DIỆN CHÍNH STREAMLIT (V6.0 CLOUD EDITION)
+# 8. THANH BÊN (SIDEBAR): CẤU HÌNH HỆ THỐNG, TỪ ĐIỂN & CLOUD TM
 # ============================================================
-st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO PRO (V6.0)</p>', unsafe_allow_html=True)
+with st.sidebar:
+    st.markdown("### 🛠️ Quản trị & Cấu hình")
+    
+    # Chọn nhanh Model AI ở đầu Sidebar
+    model_list = st.session_state.get("available_models", [
+        "qwen/qwen3.8-27b",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "deepseek-r1-distill-llama-70b",
+        "gemma2-9b-it"
+    ])
+    selected_model = st.selectbox("🤖 Model AI dịch thuật:", options=model_list)
+
+    # 1. Kết nối Máy chủ & Cloud (Đóng gọn mặc định)
+    with st.expander("🔌 Kết nối Server AI & Google Sheets", expanded=False):
+        proxy_url = st.text_input("🔗 Cloudflare Worker:", value=DEFAULT_PROXY_URL)
+        gsheet_url = st.text_input("☁️ Google Sheets Web App:", value=DEFAULT_GSHEET_WEBAPP_URL)
+        direct_key = st.text_input("🔑 Groq API Key (Tùy chọn):", type="password")
+        
+        sb_c1, sb_c2 = st.columns(2)
+        with sb_c1:
+            if st.button("🔄 Tải Model", use_container_width=True):
+                try:
+                    models = fetch_live_chat_models(proxy_url, direct_key)
+                    st.session_state.available_models = models
+                    st.success(f"Đã tải {len(models)} model!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
+        with sb_c2:
+            if st.button("☁️ Đồng bộ Cloud", use_container_width=True):
+                ok, msg = sync_from_gsheet(gsheet_url)
+                st.session_state.cloud_sync_status = (ok, msg)
+                if ok: st.success(msg)
+                else: st.warning(msg)
+
+    # 2. Khung Từ viết tắt & Thuật ngữ CHUYÊN NGÀNH Ô TÔ
+    g_count_now = len(glossary_str_to_dict(st.session_state.glossary_text))
+    with st.expander(f"📚 Từ điển & Viết tắt THACO ({g_count_now} từ)", expanded=False):
+        st.caption("Cú pháp: `Tiếng Việt = Tiếng Anh chuẩn`")
+        new_glossary = st.text_area(
+            "Danh sách thuật ngữ:",
+            value=st.session_state.glossary_text,
+            height=220,
+            label_visibility="collapsed"
+        )
+        if st.button("💾 Lưu lên Google Sheets", use_container_width=True):
+            st.session_state.glossary_text = new_glossary
+            if save_glossary_text(new_glossary, gsheet_url):
+                st.success("✅ Đã lưu lên Google Sheets!")
+            else:
+                st.info("💾 Đã lưu cục bộ.")
+
+    # 3. Khung Bộ nhớ đệm Translation Memory (TM)
+    with st.expander(f"🧠 Bộ nhớ đệm Cloud TM ({len(st.session_state.tm_data)} câu)", expanded=False):
+        tm_df_export = pd.DataFrame(
+            [{"Khoa_Goc": k, "Ban_Dich_Chuan": v} for k, v in st.session_state.tm_data.items()]
+        )
+        st.download_button(
+            "⬇️ Tải file TM (.csv)",
+            data=tm_df_export.to_csv(index=False).encode("utf-8-sig"),
+            file_name="THACO_Translation_Memory.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        if st.button("🔄 Làm mới TM từ Google Sheets", use_container_width=True):
+            ok, msg = sync_from_gsheet(gsheet_url)
+            if ok:
+                st.success(msg)
+                st.rerun()
+
+    st.divider()
+    if st.session_state.get("cloud_sync_status"):
+        sync_ok, sync_msg = st.session_state.cloud_sync_status
+        st.caption(f"{'🟢' if sync_ok else '🟠'} {sync_msg}")
+
+# ============================================================
+# 9. MÀN HÌNH CHÍNH: BỐ CỤC TRỰC QUAN - UPLOAD FILE NGAY ĐẦU TRANG
+# ============================================================
+st.markdown('<p class="main-title">⚡ Hệ thống Dịch thuật AI Chuyên ngành Ô tô - MASTERLUU PRO</p>', unsafe_allow_html=True)
 st.markdown(
     '<p class="sub-title">'
-    '<span class="badge-pro">PRO V6.0</span>'
-    '<span class="badge-cloud">☁️ Google Sheets Cloud Sync</span> '
-    'Dịch nguyên câu chống đứt từ • Từ điển THACO • Xuất Song Ngữ • Dịch Đa Chiều (Việt ⇄ Anh) • Hiệu đính Nhanh'
+    '<span class="badge-pro">PRO V6.1</span>'
+    '<span class="badge-cloud">☁️ Google Sheets Sync</span> '
+    'Dịch nguyên câu chống đứt từ • Từ điển chuyên ngành ô tô • Xuất Song Ngữ • Dịch Đa Chiều (Việt ⇄ Anh) • Hiệu đính Nhanh'
     '</p>',
     unsafe_allow_html=True
 )
 
-col_left, col_right = st.columns([1.15, 2.0])
+col_work, col_monitor = st.columns([1.15, 1.85], gap="large")
 
-with col_left:
-    st.markdown("#### ⚙️ 1. Kết nối Máy chủ AI & Google Sheets Cloud")
+# --- CỘT TRÁI: TẢI FILE LÊN NGAY ĐẦU TRANG & TÙY CHỌN DỊCH NHANH ---
+with col_work:
     with st.container(border=True):
-        proxy_url = st.text_input("🔗 Đường dẫn Cloudflare Worker:", value=DEFAULT_PROXY_URL)
-        gsheet_url = st.text_input("☁️ Link Google Sheets Web App (Lưu TM & Từ điển):", value=DEFAULT_GSHEET_WEBAPP_URL)
-        direct_key = st.text_input("🔑 Groq API Key trực tiếp (Tùy chọn nếu không qua Worker):", type="password")
-        
-        btn_c1, btn_c2 = st.columns(2)
-        with btn_c1:
-            if st.button("🔄 Tải Model AI", use_container_width=True):
-                try:
-                    with st.spinner("Đang tải model..."):
-                        models = fetch_live_chat_models(proxy_url, direct_key)
-                        st.session_state.available_models = models
-                        st.success(f"✅ Tìm thấy {len(models)} model!")
-                except Exception as e:
-                    st.error(f"❌ Lỗi: {str(e)}")
-        with btn_c2:
-            if st.button("☁️ Đồng bộ Google Sheets", use_container_width=True):
-                with st.spinner("Đang đồng bộ dữ liệu đám mây..."):
-                    ok, msg = sync_from_gsheet(gsheet_url)
-                    st.session_state.cloud_sync_status = (ok, msg)
-                    if ok:
-                        st.success(msg)
-                    else:
-                        st.warning(msg)
+        st.markdown("##### 📂 1. Tải lên Tài liệu cần dịch")
+        uploaded_file = st.file_uploader(
+            "Kéo thả file Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf) vào đây:",
+            type=["xlsx", "docx", "pptx", "pdf"]
+        )
 
-        # Hiển thị trạng thái tự động đồng bộ lần đầu
-        if st.session_state.get("cloud_sync_status"):
-            sync_ok, sync_msg = st.session_state.cloud_sync_status
-            if sync_ok:
-                st.caption(f"🟢 {sync_msg}")
-            else:
-                st.caption(f"🟠 {sync_msg}")
-
-        model_list = st.session_state.get("available_models", [
-            "qwen/qwen3.8-27b",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "deepseek-r1-distill-llama-70b",
-            "gemma2-9b-it"
-        ])
-        selected_model = st.selectbox("🤖 Chọn Model AI dịch thuật:", options=model_list)
-
-        st.divider()
+        st.markdown("##### ⚙️ 2. Tùy chọn Chế độ Dịch")
         direction = st.radio("🌐 Chiều dịch thuật:", ["Việt → Anh", "Anh → Việt"], horizontal=True)
         
-        c1, c2 = st.columns(2)
-        with c1:
+        opt_c1, opt_c2 = st.columns(2)
+        with opt_c1:
             bilingual = st.checkbox("📖 Xuất Song Ngữ\n(Gốc + Dịch dòng dưới)", value=False)
             translate_sheets = st.checkbox("📑 Dịch tên Sheet Excel", value=True)
-        with c2:
+        with opt_c2:
             auto_fit = st.checkbox("📐 Auto-Fit Layout\n(Tự xuống dòng & giãn cột)", value=True)
             enable_review = st.checkbox("✍️ Duyệt & Hiệu đính\ntrước khi xuất File", value=True)
 
-    # --- KHUNG QUẢN LÝ TỪ VIẾT TẮT & THUẬT NGỮ THACO ---
-    g_count_now = len(glossary_str_to_dict(st.session_state.glossary_text))
-    with st.expander(f"📚 2. Khung Từ viết tắt & Thuật ngữ THACO ({g_count_now} mục)", expanded=False):
-        st.caption("Nhập theo cú pháp `Từ viết tắt / Tiếng Việt = Tiếng Anh chuẩn`. Khi bấm Lưu sẽ tự động cập nhật lên tab **Glossary** trên Google Sheets:")
-        new_glossary = st.text_area(
-            "Bảng thuật ngữ THACO:",
-            value=st.session_state.glossary_text,
-            height=240
+        st.write("")
+        btn_label = "🚀 BẮT ĐẦU PHÂN TÍCH & DỊCH NHÁP (ĐỂ HIỆU ĐÍNH)" if enable_review else "🚀 BẮT ĐẦU DỊCH & XUẤT FILE NGAY"
+        start_clicked = st.button(
+            btn_label,
+            type="primary",
+            use_container_width=True,
+            disabled=(uploaded_file is None)
         )
-        if st.button("💾 Lưu Bảng Thuật Ngữ lên Google Sheets", use_container_width=True):
-            st.session_state.glossary_text = new_glossary
-            ok_push = save_glossary_text(new_glossary, gsheet_url)
-            if ok_push:
-                st.success("✅ Đã lưu Bảng thuật ngữ THACO lên Google Sheets thành công!")
-            else:
-                st.info("💾 Đã lưu cục bộ (Kiểm tra lại quyền truy cập Web App nếu muốn đẩy lên Google Sheets).")
+        if uploaded_file is None:
+            st.caption("💡 *Hãy kéo thả hoặc chọn 1 file ở khung trên để kích hoạt nút Dịch.*")
 
-    # --- KHUNG BỘ NHỚ ĐỆM TRANSLATION MEMORY (TM) ---
-    with st.expander(f"🧠 3. Bộ nhớ đệm Dịch thuật - Cloud TM ({len(st.session_state.tm_data)} câu)", expanded=False):
-        st.caption("Toàn bộ câu dịch mới và câu hiệu đính đều được tự động đồng bộ vào tab **TM** trên Google Sheets:")
-        tm_col1, tm_col2 = st.columns(2)
-        with tm_col1:
-            tm_df_export = pd.DataFrame(
-                [{"Khoa_Goc": k, "Ban_Dich_Chuan": v} for k, v in st.session_state.tm_data.items()]
-            )
+    # Hiển thị nút Tải xuống nổi bật ngay dưới khung làm việc nếu đã xử lý xong
+    if st.session_state.get("final_output_bytes") is not None:
+        with st.container(border=True):
+            st.success(f"🎉 Hoàn tất! File **{st.session_state.final_output_name}** đã sẵn sàng:")
             st.download_button(
-                "⬇️ Tải bản sao TM (.csv)",
-                data=tm_df_export.to_csv(index=False).encode("utf-8-sig"),
-                file_name="THACO_Translation_Memory.csv",
-                mime="text/csv",
+                label=f"⬇️ TẢI XUỐNG FILE HOÀN THIỆN ({st.session_state.final_output_name})",
+                data=st.session_state.final_output_bytes,
+                file_name=st.session_state.final_output_name,
+                mime="application/octet-stream",
+                type="primary",
                 use_container_width=True
             )
-        with tm_col2:
-            if st.button("🔄 Nạp lại TM từ Google Sheets", use_container_width=True):
-                ok, msg = sync_from_gsheet(gsheet_url)
-                if ok:
-                    st.success(msg)
-                    st.rerun()
 
-    st.markdown("#### 📂 4. Tải lên Tài liệu cần dịch")
-    uploaded_file = st.file_uploader(
-        "Hỗ trợ Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)",
-        type=["xlsx", "docx", "pptx", "pdf"]
-    )
+# --- CỘT PHẢI: MÀN HÌNH GIÁM SÁT & BẢNG HIỆU ĐÍNH NHANH ---
+with col_monitor:
+    # Thanh trạng thái tóm tắt gọn đẹp ở đầu cột phải
+    st_c1, st_c2, st_c3 = st.columns(3)
+    with st_c1:
+        st.markdown(f"<div class='stat-box'>🤖 <b>Model:</b> {selected_model.split('/')[-1]}</div>", unsafe_allow_html=True)
+    with st_c2:
+        st.markdown(f"<div class='stat-box'>📚 <b>Thuật ngữ chuyên ngành ô tô:</b> {g_count_now} mục</div>", unsafe_allow_html=True)
+    with st_c3:
+        st.markdown(f"<div class='stat-box'>🧠 <b>Bộ nhớ Cloud TM:</b> {len(st.session_state.tm_data)} câu</div>", unsafe_allow_html=True)
 
-with col_right:
-    st.markdown("#### 🖥️ Màn hình Giám sát (Live Console)")
-    log_placeholder = st.empty()
-    if not st.session_state.logs:
-        log_placeholder.markdown(
-            "<div class='log-container'>✅ Hệ thống THACO AI Translator PRO V6.0 (Google Sheets Cloud) sẵn sàng!<br>"
-            "• <b>Đồng bộ Đám mây Vĩnh viễn</b>: Tự động nạp/lưu Từ điển THACO (tab Glossary) và Bộ nhớ dịch (tab TM) trên Google Sheets.<br>"
-            "• <b>Dịch nguyên câu (Paragraph-level)</b>: Chống cắt vụn chữ trong PowerPoint & Word, giữ nguyên bố cục và định dạng.<br>"
-            "• <b>Tích hợp đầy đủ</b>: Xuất Song Ngữ, Dịch Đa Chiều (Việt ⇄ Anh), Bảng Hiệu đính Nhanh & Auto-Fit Layout.</div>",
-            unsafe_allow_html=True
-        )
-    else:
-        display_logs = "<br>".join(st.session_state.logs[-50:])
-        log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
+    st.write("")
+    tab_console, tab_review = st.tabs([
+        "🖥️ Nhật ký Tiến trình (Live Console)",
+        f"✍️ Bảng Hiệu đính Nhanh ({len(st.session_state.review_df) if st.session_state.review_df is not None else 0} câu)"
+    ])
 
-    progress_bar = st.progress(0.0)
+    with tab_console:
+        log_placeholder = st.empty()
+        if not st.session_state.logs:
+            log_placeholder.markdown(
+                "<div class='log-container'>✅ Hệ thống THACO AI Translator PRO V6.1 sẵn sàng!<br>"
+                "• <b>Giao diện tối ưu</b>: Tải file và bấm dịch ngay lập tức ở khung bên trái.<br>"
+                "• <b>Cấu hình nâng cao</b>: Quản lý Từ điển THACO, Cloud TM & đổi Model AI nằm gọn ở thanh menu ngoài cùng bên trái.</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            display_logs = "<br>".join(st.session_state.logs[-50:])
+            log_placeholder.markdown(f"<div class='log-container'>{display_logs}</div>", unsafe_allow_html=True)
 
-    if uploaded_file is not None:
-        btn_label = "🚀 1. PHÂN TÍCH & DỊCH NHÁP BẰNG AI (ĐỂ HIỆU ĐÍNH)" if enable_review else "🚀 BẮT ĐẦU DỊCH & XUẤT FILE NGAY"
-        if st.button(btn_label, type="primary", use_container_width=True):
-            st.session_state.logs = []
-            st.session_state.glossary_text = new_glossary
-            st.session_state.staged_file_bytes = uploaded_file.getvalue()
-            st.session_state.staged_file_name = uploaded_file.name
-            
-            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            add_log(f"🚀 Bắt đầu xử lý '{uploaded_file.name}' | Model: {selected_model} | Chiều: {direction}", log_placeholder)
+        progress_bar = st.progress(0.0)
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
-                tmp_in.write(st.session_state.staged_file_bytes)
-                input_path = tmp_in.name
-
-            try:
-                start_t = time.time()
-                add_log("🔍 Đang quét cấu trúc file và hợp nhất các đoạn văn bị cắt vụn...", log_placeholder)
-                unique_list = extract_all_unique_strings_from_file(input_path, file_ext, direction, translate_sheets)
-                
-                trans_map = translate_unique_list(
-                    unique_list, selected_model, proxy_url, direct_key, gsheet_url,
-                    direction, st.session_state.glossary_text, log_placeholder, progress_bar
-                )
-                
-                elapsed = round(time.time() - start_t, 1)
-                add_log(f"🎉 Đã dịch xong {len(unique_list)} câu duy nhất trong {elapsed} giây!", log_placeholder)
-
-                st.session_state.review_df = pd.DataFrame([
-                    {"Câu gốc trong File": k, "Bản dịch AI (Bấm đúp để sửa tay)": v}
-                    for k, v in trans_map.items()
-                ])
-
-                # Nếu tắt chế độ Hiệu đính -> Xuất file luôn trong 1 chạm
-                if not enable_review:
-                    output_ext = ".docx" if file_ext == ".pdf" else file_ext
-                    suffix_tag = "_Bilingual" if bilingual else ("_EN" if direction == "Việt → Anh" else "_VN")
-                    output_name = uploaded_file.name.replace(file_ext, f"{suffix_tag}{output_ext}")
-                    output_path = input_path.replace(file_ext, f"_out{output_ext}")
-
-                    apply_translations_to_file(
-                        input_path, output_path, file_ext, trans_map,
-                        bilingual, auto_fit, translate_sheets, log_placeholder
-                    )
-                    with open(output_path, "rb") as f:
-                        st.session_state.final_output_bytes = f.read()
-                        st.session_state.final_output_name = output_name
-                    if os.path.exists(output_path):
-                        os.remove(output_path)
-
-            except Exception as e:
-                add_log(f"❌ LỖI HỆ THỐNG: {str(e)}", log_placeholder)
-            finally:
-                if os.path.exists(input_path):
-                    os.remove(input_path)
-
-    # --- HIỂN THỊ BẢNG HIỆU ĐÍNH NHANH (INTERACTIVE REVIEW) ---
-    if st.session_state.review_df is not None and enable_review:
-        st.markdown("---")
-        st.markdown("#### ✍️ Bảng Hiệu đính Nhanh trước khi xuất File")
-        st.caption("Anh có thể kiểm tra và gõ sửa trực tiếp vào cột **'Bản dịch AI'**. Khi bấm Áp dụng, các câu sửa tay sẽ tự động được đẩy lên Google Sheets (tab TM) để lưu vĩnh viễn:")
+    # Xử lý sự kiện khi bấm nút BẮT ĐẦU DỊCH
+    if uploaded_file is not None and start_clicked:
+        st.session_state.logs = []
+        st.session_state.final_output_bytes = None
+        st.session_state.glossary_text = new_glossary
+        st.session_state.staged_file_bytes = uploaded_file.getvalue()
+        st.session_state.staged_file_name = uploaded_file.name
         
-        edited_df = st.data_editor(
-            st.session_state.review_df,
-            use_container_width=True,
-            height=320,
-            disabled=["Câu gốc trong File"],
-            key="editor_grid"
-        )
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        add_log(f"🚀 Bắt đầu xử lý '{uploaded_file.name}' | Model: {selected_model} | Chiều: {direction}", log_placeholder)
 
-        if st.button("✅ 2. ÁP DỤNG BẢN HIỆU ĐÍNH, LƯU GOOGLE SHEETS & KẾT XUẤT FILE", type="primary", use_container_width=True):
-            if st.session_state.staged_file_bytes:
-                file_name = st.session_state.staged_file_name
-                file_ext = os.path.splitext(file_name)[1].lower()
-                
-                final_map = {}
-                changed_for_cloud = {}
-                tm = st.session_state.tm_data
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
+            tmp_in.write(st.session_state.staged_file_bytes)
+            input_path = tmp_in.name
 
-                for _, row in edited_df.iterrows():
-                    orig_s = str(row["Câu gốc trong File"]).strip()
-                    edit_s = str(row["Bản dịch AI (Bấm đúp để sửa tay)"]).strip()
-                    final_map[orig_s] = edit_s
-                    tm_k = f"{direction}::{orig_s}"
-                    if tm.get(tm_k) != edit_s:
-                        changed_for_cloud[tm_k] = edit_s
-                    tm[tm_k] = edit_s
+        try:
+            start_t = time.time()
+            add_log("🔍 Đang quét cấu trúc file và hợp nhất các đoạn văn bị cắt vụn...", log_placeholder)
+            unique_list = extract_all_unique_strings_from_file(input_path, file_ext, direction, translate_sheets)
+            
+            trans_map = translate_unique_list(
+                unique_list, selected_model, proxy_url, direct_key, gsheet_url,
+                direction, st.session_state.glossary_text, log_placeholder, progress_bar
+            )
+            
+            elapsed = round(time.time() - start_t, 1)
+            add_log(f"🎉 Đã dịch xong {len(unique_list)} câu duy nhất trong {elapsed} giây!", log_placeholder)
 
-                # Đẩy những câu được hiệu đính lên Google Sheets
-                save_tm(tm, new_items_only=changed_for_cloud if changed_for_cloud else None, webapp_url=gsheet_url)
-                if changed_for_cloud:
-                    add_log(f"☁️ Đã cập nhật {len(changed_for_cloud)} câu hiệu đính mới lên Google Sheets.", log_placeholder)
+            st.session_state.review_df = pd.DataFrame([
+                {"Câu gốc trong File": k, "Bản dịch AI (Bấm đúp để sửa tay)": v}
+                for k, v in trans_map.items()
+            ])
 
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
-                    tmp_in.write(st.session_state.staged_file_bytes)
-                    in_p = tmp_in.name
-
+            if enable_review:
+                add_log("👉 Mời anh chuyển sang tab '✍️ Bảng Hiệu đính Nhanh' bên cạnh để kiểm tra và xuất file!", log_placeholder)
+            else:
                 output_ext = ".docx" if file_ext == ".pdf" else file_ext
                 suffix_tag = "_Bilingual" if bilingual else ("_EN" if direction == "Việt → Anh" else "_VN")
-                output_name = file_name.replace(file_ext, f"{suffix_tag}{output_ext}")
-                out_p = in_p.replace(file_ext, f"_out{output_ext}")
+                output_name = uploaded_file.name.replace(file_ext, f"{suffix_tag}{output_ext}")
+                output_path = input_path.replace(file_ext, f"_out{output_ext}")
 
-                try:
-                    apply_translations_to_file(
-                        in_p, out_p, file_ext, final_map,
-                        bilingual, auto_fit, translate_sheets, log_placeholder
-                    )
-                    with open(out_p, "rb") as f:
-                        st.session_state.final_output_bytes = f.read()
-                        st.session_state.final_output_name = output_name
-                    add_log(f"✅ Đã kết xuất thành công file '{output_name}'! Mời anh bấm nút tải xuống bên dưới.", log_placeholder)
-                finally:
-                    if os.path.exists(in_p): os.remove(in_p)
-                    if os.path.exists(out_p): os.remove(out_p)
+                apply_translations_to_file(
+                    input_path, output_path, file_ext, trans_map,
+                    bilingual, auto_fit, translate_sheets, log_placeholder
+                )
+                with open(output_path, "rb") as f:
+                    st.session_state.final_output_bytes = f.read()
+                    st.session_state.final_output_name = output_name
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                st.rerun()
 
-    # --- NÚT TẢI FILE KẾT QUẢ ---
-    if st.session_state.get("final_output_bytes") is not None:
-        st.success(f"🎉 File **{st.session_state.final_output_name}** đã sẵn sàng tải xuống!")
-        st.download_button(
-            label=f"⬇️ TẢI XUỐNG FILE HOÀN THIỆN ({st.session_state.final_output_name})",
-            data=st.session_state.final_output_bytes,
-            file_name=st.session_state.final_output_name,
-            mime="application/octet-stream",
-            type="primary",
-            use_container_width=True
-        )
+        except Exception as e:
+            add_log(f"❌ LỖI HỆ THỐNG: {str(e)}", log_placeholder)
+        finally:
+            if os.path.exists(input_path):
+                os.remove(input_path)
+
+    # Nội dung Tab Bảng Hiệu đính Nhanh
+    with tab_review:
+        if st.session_state.review_df is not None:
+            st.caption("Bấm đúp vào cột **'Bản dịch AI'** để sửa tay. Khi bấm Kết xuất, các câu sửa sẽ tự động lưu lên Google Sheets:")
+            edited_df = st.data_editor(
+                st.session_state.review_df,
+                use_container_width=True,
+                height=280,
+                disabled=["Câu gốc trong File"],
+                key="editor_grid"
+            )
+
+            if st.button("✅ ÁP DỤNG BẢN HIỆU ĐÍNH, LƯU CLOUD & KẾT XUẤT FILE", type="primary", use_container_width=True):
+                if st.session_state.staged_file_bytes:
+                    file_name = st.session_state.staged_file_name
+                    file_ext = os.path.splitext(file_name)[1].lower()
+                    
+                    final_map = {}
+                    changed_for_cloud = {}
+                    tm = st.session_state.tm_data
+
+                    for _, row in edited_df.iterrows():
+                        orig_s = str(row["Câu gốc trong File"]).strip()
+                        edit_s = str(row["Bản dịch AI (Bấm đúp để sửa tay)"]).strip()
+                        final_map[orig_s] = edit_s
+                        tm_k = f"{direction}::{orig_s}"
+                        if tm.get(tm_k) != edit_s:
+                            changed_for_cloud[tm_k] = edit_s
+                        tm[tm_k] = edit_s
+
+                    save_tm(tm, new_items_only=changed_for_cloud if changed_for_cloud else None, webapp_url=gsheet_url)
+                    if changed_for_cloud:
+                        add_log(f"☁️ Đã cập nhật {len(changed_for_cloud)} câu hiệu đính lên Google Sheets.", log_placeholder)
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_in:
+                        tmp_in.write(st.session_state.staged_file_bytes)
+                        in_p = tmp_in.name
+
+                    output_ext = ".docx" if file_ext == ".pdf" else file_ext
+                    suffix_tag = "_Bilingual" if bilingual else ("_EN" if direction == "Việt → Anh" else "_VN")
+                    output_name = file_name.replace(file_ext, f"{suffix_tag}{output_ext}")
+                    out_p = in_p.replace(file_ext, f"_out{output_ext}")
+
+                    try:
+                        apply_translations_to_file(
+                            in_p, out_p, file_ext, final_map,
+                            bilingual, auto_fit, translate_sheets, log_placeholder
+                        )
+                        with open(out_p, "rb") as f:
+                            st.session_state.final_output_bytes = f.read()
+                            st.session_state.final_output_name = output_name
+                        add_log(f"✅ Đã kết xuất thành công file '{output_name}'!", log_placeholder)
+                        st.rerun()
+                    finally:
+                        if os.path.exists(in_p): os.remove(in_p)
+                        if os.path.exists(out_p): os.remove(out_p)
+        else:
+            st.info("📋 Bảng hiệu đính sẽ xuất hiện tại đây ngay sau khi anh tải file lên và bấm nút **Bắt đầu Phân tích & Dịch nháp**.")
