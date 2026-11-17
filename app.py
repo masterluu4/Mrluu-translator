@@ -1,5 +1,5 @@
 # app.py
-# MASTERLUU PRO - HỆ THỐNG DỊCH THUẬT AI CHUYÊN NGÀNH Ô TÔ (V7.0 - DIGITAL COCKPIT UI)
+# LUU PRO - HỆ THỐNG DỊCH THUẬT AI CHUYÊN NGÀNH Ô TÔ (V7.0 - DIGITAL COCKPIT UI)
 # Giữ nguyên 100% Logic Dịch thuật & Đồng bộ Google Sheets + Giao diện Enterprise SaaS Hiện đại
 
 import streamlit as st
@@ -34,7 +34,7 @@ TM_FILE = "translation_memory.json"
 GLOSSARY_FILE = "thaco_glossary.txt"
 
 st.set_page_config(
-    page_title="MASTERLUU PRO | Automotive AI Translator",
+    page_title="LUU PRO | Automotive AI Translator",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -512,7 +512,7 @@ if "cloud_sync_status" not in st.session_state:
 
 def render_terminal_html(logs_list: list) -> str:
     body = "<br>".join(logs_list[-50:]) if logs_list else (
-        "✅ <b>MASTERLUU PRO V7.0 (Digital Cockpit Edition)</b> sẵn sàng hoạt động!<br>"
+        "✅ <b>LUU PRO V7.0 (Digital Cockpit Edition)</b> sẵn sàng hoạt động!<br>"
         "• <b>Bước 1</b>: Kéo thả tài liệu (.xlsx, .docx, .pptx, .pdf) vào Phân khu 01 bên trái.<br>"
         "• <b>Bước 2</b>: Chọn chế độ ở Phân khu 02 và nhấn nút <b>Bắt đầu</b> để AI xử lý."
     )
@@ -1128,7 +1128,7 @@ with st.sidebar:
 st.markdown("""
     <div class="hero-banner">
         <div>
-            <div class="hero-title">⚡ HỆ THỐNG DỊCH THUẬT AI CHUYÊN NGÀNH Ô TÔ — MASTERLUU PRO</div>
+            <div class="hero-title">⚡ HỆ THỐNG DỊCH THUẬT AI CHUYÊN NGÀNH Ô TÔ — LUU PRO</div>
             <div class="hero-sub">Nền tảng Dịch thuật Kỹ thuật Số • Bảo toàn 100% Cấu trúc Excel, Word, PowerPoint, PDF • Đồng bộ Đám mây Thời gian thực</div>
         </div>
         <div class="hero-badges">
@@ -1145,7 +1145,7 @@ with col_work:
     with st.container(border=True):
         st.markdown(
             '<div class="zone-header-blue">'
-            '<span>📂 PHÂN KHU 01: TIẾP NHẬN TÀI LIỆU KỸ THUẬT</span>'
+            '<span>📂 1. TIẾP NHẬN TÀI LIỆU KỸ THUẬT</span>'
             '<span class="step-pill">BƯỚC 1</span>'
             '</div>',
             unsafe_allow_html=True
@@ -1157,7 +1157,7 @@ with col_work:
 
         st.markdown(
             '<div class="zone-header-teal">'
-            '<span>⚙️ PHÂN KHU 02: THIẾT LẬP CHẾ ĐỘ XỬ LÝ AI</span>'
+            '<span>⚙️ 2. THIẾT LẬP CHẾ ĐỘ XỬ LÝ AI</span>'
             '<span class="step-pill-teal">BƯỚC 2</span>'
             '</div>',
             unsafe_allow_html=True
