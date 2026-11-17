@@ -1,6 +1,6 @@
 # app.py
-# Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO (Phiên bản Enterprise Pro)
-# Tích hợp 6 tính năng nâng cao: PPTX, Song ngữ, Đa chiều, Hiệu đính, Translation Memory, Auto-Fit & Shapes
+# Hệ thống Dịch thuật AI Chuyên ngành Ô tô - THACO (Phiên bản Enterprise Pro - Safe Boot)
+# Chống lỗi sập App ("Oh no") + Tích hợp đầy đủ 6 tính năng nâng cao
 
 import streamlit as st
 import requests
@@ -9,15 +9,24 @@ import time
 import os
 import tempfile
 import re
-from copy import copy
 import pandas as pd
 
-# ----- Thư viện xử lý File -----
+# ----- Safe Import các thư viện xử lý File (Chống crash app nếu server chưa kịp cài) -----
 from docx import Document
 import openpyxl
 from openpyxl.styles import Alignment
-from pdf2docx import Converter
-from pptx import Presentation
+
+try:
+    from pdf2docx import Converter
+    HAS_PDF = True
+except ImportError:
+    HAS_PDF = False
+
+try:
+    from pptx import Presentation
+    HAS_PPTX = True
+except ImportError:
+    HAS_PPTX = False
 
 # ============================================================
 # 1. CẤU HÌNH MẶC ĐỊNH & GIAO DIỆN
@@ -35,7 +44,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo các biến Session State chống mất dữ liệu khi tương tác UI
+# Khởi tạo các biến Session State
 if "logs" not in st.session_state:
     st.session_state.logs = []
 if "translation_memory" not in st.session_state:
@@ -57,7 +66,6 @@ if "translation_done" not in st.session_state:
     st.session_state.translation_done = False
 
 def save_tm_to_disk():
-    """Lưu Bộ nhớ dịch thuật xuống ổ cứng máy chủ"""
     try:
         with open(TM_FILE_PATH, "w", encoding="utf-8") as f:
             json.dump(st.session_state.translation_memory, f, ensure_ascii=False, indent=2)
@@ -136,11 +144,8 @@ def fetch_live_chat_models(proxy_url: str, direct_key: str = ""):
     return chat_models
 
 def is_part_code_or_number(t: str) -> bool:
-    """Nhận diện chính xác Mã phụ tùng, số đo, ngày tháng để bảo toàn 100%"""
-    # Chỉ chứa số, dấu chấm, phẩy, gạch ngang, gạch chéo, khoảng trắng (VD: 390-275-225, 2026-049, 3.2)
     if re.match(r'^[\d\s.,\-+/&:()]+$', t):
         return True
-    # Mã phụ tùng chữ liền số không có khoảng trắng (VD: 1005P320, CNA6128Y-1312010, JS180-1601021-5)
     if " " not in t and any(c.isdigit() for c in t) and re.match(r'^[A-Za-z0-9\-_./]+$', t):
         return True
     return False
@@ -149,19 +154,16 @@ def should_translate(text: str, direction: str) -> bool:
     t = text.strip()
     if not t or t.startswith("=") or is_part_code_or_number(t):
         return False
-    # Phải có ít nhất 1 chữ cái
     if not re.search(r'[A-Za-zÀ-ỹ]', t):
         return False
 
     if direction == "Việt → Anh (VI → EN)":
-        # Có dấu tiếng Việt -> Dịch
         if re.search(r'[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]', t):
             return True
         if t.upper() in ["STT", "SL", "TONG", "DVT", "BCKT"]:
             return True
         return False
     else:
-        # Chiều Anh -> Việt: Dịch mọi câu tiếng Anh (bỏ qua các ký hiệu quá ngắn như LH, RH, OK)
         if t.upper() in ["LH", "RH", "ID", "OK", "VIN", "CKD", "CBU"]:
             return False
         return True
@@ -198,7 +200,6 @@ def call_ai_batch(batch_dict: dict, model_id: str, direction: str, proxy_url: st
                 raise Exception(f"HTTP {resp.status_code}: {resp.text[:150]}")
 
             content = resp.json()["choices"][0]["message"]["content"].strip()
-            # Loại bỏ thẻ <think>...</think> nếu dùng các model suy luận như Qwen/DeepSeek
             content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
@@ -213,7 +214,7 @@ def call_ai_batch(batch_dict: dict, model_id: str, direction: str, proxy_url: st
     return batch_dict
 
 # ============================================================
-# 4. QUÉT FILE & TẠO BẢNG DỊCH THUẬT (KẾT HỢP TRANSLATION MEMORY)
+# 4. QUÉT FILE & TẠO BẢNG DỊCH THUẬT
 # ============================================================
 def collect_docx_texts(doc, out_list: list):
     for p in doc.paragraphs:
@@ -227,7 +228,6 @@ def collect_docx_texts(doc, out_list: list):
                     for r in p.runs:
                         if r.text and r.text.strip():
                             out_list.append(r.text.strip())
-    # Quét thêm Textbox nổi bên trong Word (w:txbxContent)
     for txbx in doc.element.body.iter():
         if txbx.tag.endswith('txbxContent'):
             for p_elem in txbx.iter():
@@ -247,46 +247,46 @@ def collect_pptx_shape_texts(shape, out_list: list):
                     for r in p.runs:
                         if r.text and r.text.strip():
                             out_list.append(r.text.strip())
-    if shape.shape_type == 6 and hasattr(shape, "shapes"): # 6 = GROUP SHAPE
+    if shape.shape_type == 6 and hasattr(shape, "shapes"):
         for sub_shape in shape.shapes:
             collect_pptx_shape_texts(sub_shape, out_list)
 
 def extract_unique_strings_from_file(input_path: str, file_ext: str, direction: str, translate_sheets: bool) -> list:
-    raw_Candidates = []
+    raw_candidates = []
     if file_ext == ".xlsx":
         wb = openpyxl.load_workbook(input_path)
         for ws in wb.worksheets:
             if translate_sheets and ws.title:
-                raw_Candidates.append(ws.title.strip())
+                raw_candidates.append(ws.title.strip())
             for row in ws.iter_rows():
                 for cell in row:
                     if isinstance(cell.value, str) and cell.value.strip():
-                        raw_Candidates.append(cell.value.strip())
-            # Quét Shapes/Textbox nổi trong Excel nếu có
-            if hasattr(ws, "_charts") or hasattr(ws, "_drawing"):
-                pass
+                        raw_candidates.append(cell.value.strip())
     elif file_ext == ".docx":
         doc = Document(input_path)
-        collect_docx_texts(doc, raw_Candidates)
+        collect_docx_texts(doc, raw_candidates)
     elif file_ext == ".pdf":
+        if not HAS_PDF:
+            raise Exception("Thư viện pdf2docx chưa được cài đặt trên máy chủ.")
         temp_docx = input_path.replace(".pdf", "_scan.docx")
         cv = Converter(input_path)
         cv.convert(temp_docx)
         cv.close()
         doc = Document(temp_docx)
-        collect_docx_texts(doc, raw_Candidates)
+        collect_docx_texts(doc, raw_candidates)
         if os.path.exists(temp_docx):
             os.remove(temp_docx)
     elif file_ext == ".pptx":
+        if not HAS_PPTX:
+            raise Exception("Thư viện python-pptx chưa được cài đặt. Hãy kiểm tra requirements.txt.")
         prs = Presentation(input_path)
         for slide in prs.slides:
             for shape in slide.shapes:
-                collect_pptx_shape_texts(shape, raw_Candidates)
+                collect_pptx_shape_texts(shape, raw_candidates)
 
-    # Lọc duy nhất và kiểm tra điều kiện dịch
     seen = set()
     unique_valid = []
-    for s in raw_Candidates:
+    for s in raw_candidates:
         if s not in seen and should_translate(s, direction):
             seen.add(s)
             unique_valid.append(s)
@@ -297,7 +297,6 @@ def build_translation_map(unique_strings: list, model_id: str, direction: str, p
     to_ask_ai = []
     tm_dict = st.session_state.translation_memory
 
-    # 1. Tra cứu trong Translation Memory (Bộ nhớ đệm) trước
     for s in unique_strings:
         tm_key = f"{direction}||{s}"
         if use_tm and tm_key in tm_dict:
@@ -307,7 +306,7 @@ def build_translation_map(unique_strings: list, model_id: str, direction: str, p
 
     tm_hits = len(unique_strings) - len(to_ask_ai)
     if tm_hits > 0:
-        add_log(f"⚡ Lấy tức thì {tm_hits}/{len(unique_strings)} cụm từ từ Bộ nhớ dịch thuật (Translation Memory).", log_placeholder)
+        add_log(f"⚡ Lấy tức thì {tm_hits}/{len(unique_strings)} cụm từ từ Bộ nhớ dịch thuật (TM).", log_placeholder)
 
     total_ai = len(to_ask_ai)
     if total_ai == 0:
@@ -329,7 +328,6 @@ def build_translation_map(unique_strings: list, model_id: str, direction: str, p
             val = ai_resp.get(str(i), orig_str)
             clean_val = val.strip() if isinstance(val, str) and val.strip() else orig_str
             trans_map[orig_str] = clean_val
-            # Lưu vào Translation Memory
             st.session_state.translation_memory[f"{direction}||{orig_str}"] = clean_val
             
         progress_bar.progress(min((start_idx + len(batch_slice)) / total_ai, 1.0))
@@ -339,7 +337,7 @@ def build_translation_map(unique_strings: list, model_id: str, direction: str, p
     return trans_map
 
 # ============================================================
-# 5. KẾT XUẤT FILE HOÀN THIỆN (SONG NGỮ, AUTO-FIT, SHEET NAME, PPTX)
+# 5. KẾT XUẤT FILE HOÀN THIỆN
 # ============================================================
 def format_final_text(original_raw: str, trans_map: dict, bilingual: bool) -> str:
     clean = original_raw.strip()
@@ -354,7 +352,6 @@ def format_final_text(original_raw: str, trans_map: dict, bilingual: bool) -> st
     return f"{lead}{translated}{trail}"
 
 def sanitize_sheet_title(title: str, existing_titles: list) -> str:
-    """Chống lỗi vặt Excel: Tên Sheet cấm quá 31 ký tự, cấm ký tự đặc biệt và cấm trùng lặp"""
     clean = re.sub(r'[\\/*?:\[\]]', '-', title).strip()
     if not clean:
         clean = "Sheet"
@@ -369,7 +366,6 @@ def sanitize_sheet_title(title: str, existing_titles: list) -> str:
 def apply_to_excel(input_path: str, output_path: str, trans_map: dict, bilingual: bool, translate_sheets: bool, auto_fit: bool):
     wb = openpyxl.load_workbook(input_path)
     
-    # 1. Dịch nội dung ô & bật Wrap Text (Auto-fit)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for cell in row:
@@ -386,18 +382,15 @@ def apply_to_excel(input_path: str, output_path: str, trans_map: dict, bilingual
                         else:
                             cell.alignment = Alignment(wrap_text=True, vertical="center")
                             
-        # Tự động bỏ cố định chiều cao dòng nếu bật Song ngữ để Excel tự giãn dòng hiển thị đủ 2 thứ tiếng
         if bilingual or auto_fit:
             for row_idx in range(1, ws.max_row + 1):
                 ws.row_dimensions[row_idx].height = None
 
-    # 2. Dịch tên Sheet an toàn
     if translate_sheets:
         used_titles = [ws.title for ws in wb.worksheets]
         for ws in wb.worksheets:
             orig_title = ws.title.strip()
             if orig_title in trans_map:
-                # Chế độ tên sheet luôn dùng bản dịch 1 ngôn ngữ (không xuống dòng)
                 new_raw = trans_map[orig_title]
                 other_titles = [t for t in used_titles if t != ws.title]
                 safe_title = sanitize_sheet_title(new_raw, other_titles)
@@ -420,7 +413,6 @@ def apply_to_word(input_path: str, output_path: str, trans_map: dict, bilingual:
                     for r in p.runs:
                         if r.text and r.text.strip() in trans_map:
                             r.text = format_final_text(r.text, trans_map, bilingual)
-    # Dịch cả Textbox nổi trong Word
     for txbx in doc.element.body.iter():
         if txbx.tag.endswith('txbxContent'):
             for p_elem in txbx.iter():
@@ -535,7 +527,10 @@ with col_left:
                 st.rerun()
 
     st.markdown("#### 📂 3. Tải lên Tài liệu")
-    uploaded_file = st.file_uploader("Hỗ trợ .xlsx, .docx, .pptx (PowerPoint), .pdf", type=["xlsx", "docx", "pptx", "pdf"])
+    allowed_exts = ["xlsx", "docx"]
+    if HAS_PPTX: allowed_exts.append("pptx")
+    if HAS_PDF: allowed_exts.append("pdf")
+    uploaded_file = st.file_uploader("Hỗ trợ Excel (.xlsx), Word (.docx), PowerPoint (.pptx), PDF (.pdf)", type=allowed_exts)
 
 with col_right:
     st.markdown("#### 🖥️ Màn hình Giám sát (Live Console)")
@@ -575,7 +570,6 @@ with col_right:
                     unique_strs, selected_model, direction, proxy_url, direct_key, use_tm, log_placeholder, pb
                 )
                 
-                # Đưa vào DataFrame để phục vụ Hiệu đính
                 df_rows = [{"Văn bản gốc": k, "Bản dịch AI (Có thể sửa trực tiếp)": v} for k, v in trans_map.items()]
                 st.session_state.review_df = pd.DataFrame(df_rows)
                 st.session_state.translation_done = True
@@ -589,7 +583,6 @@ with col_right:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
 
-    # KHU VỰC HIỆU ĐÍNH NHANH & TẢI FILE (KHÔNG BỊ MẤT KHI CLICK)
     if st.session_state.translation_done and st.session_state.file_bytes is not None:
         st.markdown("---")
         final_trans_map = {}
@@ -608,7 +601,6 @@ with col_right:
                 orig_k = str(row["Văn bản gốc"])
                 edited_v = str(row["Bản dịch AI (Có thể sửa trực tiếp)"]).strip()
                 final_trans_map[orig_k] = edited_v
-                # Cập nhật luôn bản sửa tay vào Translation Memory
                 dir_key = st.session_state.get("last_direction", direction)
                 st.session_state.translation_memory[f"{dir_key}||{orig_k}"] = edited_v
             save_tm_to_disk()
@@ -616,7 +608,6 @@ with col_right:
             for _, row in st.session_state.review_df.iterrows():
                 final_trans_map[str(row["Văn bản gốc"])] = str(row["Bản dịch AI (Có thể sửa trực tiếp)"])
 
-        # Kết xuất file nhị phân theo đúng cấu hình Song ngữ / Auto-Fit hiện tại
         orig_name = st.session_state.file_name
         f_ext = os.path.splitext(orig_name)[1].lower()
         out_ext = ".docx" if f_ext == ".pdf" else f_ext
