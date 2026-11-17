@@ -37,25 +37,55 @@ st.set_page_config(
     page_title="LUU PRO | Automotive AI Translator",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # <-- 1. Tự động đóng gọn Sidebar khi mở trang
 )
 
 # ============================================================
-# 2. HỆ THỐNG GIAO DIỆN KỸ THUẬT SỐ (DIGITAL COCKPIT CSS V7.0)
+# 2. HỆ THỐNG GIAO DIỆN KỸ THUẬT SỐ (FULL-SCREEN MODE)
 # ============================================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    /* Nền tổng thể & Căn chỉnh chống che khuất bởi Header Streamlit */
+    /* 2. Ẩn thanh công cụ Share, Star, GitHub, Deploy và vạch màu trên cùng */
+    .stAppToolbar,
+    div[data-testid="stToolbarActions"],
+    div[data-testid="stAppDeployButton"],
+    div[data-testid="stDecoration"],
+    #MainMenu,
+    footer {
+        display: none !important;
+    }
+
+    /* Làm trong suốt thanh Header trên cùng nhưng GIỮ LẠI nút bấm mở Sidebar ở góc trái */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 2.5rem !important;
+    }
+
+    /* Làm nổi bật nút mũi tên mở Sidebar ở góc trên bên trái để dễ bấm khi cần */
+    button[data-testid="stExpandSidebarButton"],
+    div[data-testid="collapsedControl"] button {
+        background-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 10px rgba(30, 58, 138, 0.3) !important;
+    }
+    button[data-testid="stExpandSidebarButton"] svg,
+    div[data-testid="collapsedControl"] svg {
+        fill: #FFFFFF !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Kéo giao diện chính sát lên đỉnh trang để bung Full màn hình */
     .stApp {
         background: linear-gradient(160deg, #F1F5F9 0%, #E2E8F0 100%);
         font-family: 'Inter', sans-serif;
     }
     .block-container {
-        padding-top: 3.6rem !important;
-        padding-bottom: 2rem !important;
-        max-width: 97% !important;
+        padding-top: 1.2rem !important;
+        padding-bottom: 1.5rem !important;
+        max-width: 98% !important;
     }
 
     /* Thanh Sidebar phong cách Dark Industrial */
