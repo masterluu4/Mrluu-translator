@@ -44,306 +44,79 @@ st.set_page_config(
 # 2. HỆ THỐNG GIAO DIỆN KỸ THUẬT SỐ (FULL-SCREEN MODE)
 # ============================================================
 st.markdown("""
-    <style>
+<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    /* 2. Ẩn thanh công cụ Share, Star, GitHub, Deploy và vạch màu trên cùng */
-    .stAppToolbar,
-    div[data-testid="stToolbarActions"],
-    div[data-testid="stAppDeployButton"],
-    div[data-testid="stDecoration"],
-    #MainMenu,
-    footer {
-        display: none !important;
-    }
+    /* 1. ẨN THANH CÔNG CỤ STREAMLIT MẶC ĐỊNH ĐỂ MỞ RỘNG KHÔNG GIAN */
+    .stAppToolbar, div[data-testid="stToolbarActions"], div[data-testid="stAppDeployButton"], div[data-testid="stDecoration"], footer { display: none !important; }
+    header[data-testid="stHeader"] { background: transparent !important; height: 2.5rem !important; }
+    button[data-testid="stExpandSidebarButton"], div[data-testid="collapsedControl"] button { background-color: #1E3A8A !important; color: #FFFFFF !important; border-radius: 8px !important; box-shadow: 0 4px 10px rgba(30, 58, 138, 0.3) !important; }
+    button[data-testid="stExpandSidebarButton"] svg, div[data-testid="collapsedControl"] svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
 
-    /* Làm trong suốt thanh Header trên cùng nhưng GIỮ LẠI nút bấm mở Sidebar ở góc trái */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        height: 2.5rem !important;
-    }
-
-    /* Làm nổi bật nút mũi tên mở Sidebar ở góc trên bên trái để dễ bấm khi cần */
-    button[data-testid="stExpandSidebarButton"],
-    div[data-testid="collapsedControl"] button {
-        background-color: #1E3A8A !important;
-        color: #FFFFFF !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 10px rgba(30, 58, 138, 0.3) !important;
-    }
-    button[data-testid="stExpandSidebarButton"] svg,
-    div[data-testid="collapsedControl"] svg {
-        fill: #FFFFFF !important;
-        color: #FFFFFF !important;
-    }
-
-    /* Kéo giao diện chính sát lên đỉnh trang để bung Full màn hình */
-    .stApp {
-        background: linear-gradient(160deg, #F1F5F9 0%, #E2E8F0 100%);
-        font-family: 'Inter', sans-serif;
-    }
+    /* 2. ÉP FULL MÀN HÌNH 100vh VÀ TRIỆT TIÊU KHOẢNG TRỐNG THỪA */
+    .stApp { background: linear-gradient(160deg, #F1F5F9 0%, #E2E8F0 100%); font-family: 'Inter', sans-serif; }
     .block-container {
         padding-top: 1.2rem !important;
-        padding-bottom: 1.5rem !important;
+        padding-bottom: 0rem !important; 
         max-width: 98% !important;
+        min-height: 100vh !important; 
     }
 
-    /* Thanh Sidebar phong cách Dark Industrial */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%) !important;
-        border-right: 1px solid #334155;
+    /* 3. THUẬT TOÁN FLEXBOX ÉP TẤT CẢ CÁC CỘT (TRÁI/PHẢI) CAO BẰNG NHAU TUYỆT ĐỐI */
+    div[data-testid="stHorizontalBlock"] {
+        align-items: stretch !important;
     }
-    section[data-testid="stSidebar"] * {
-        color: #F8FAFC !important;
-    }
-    section[data-testid="stSidebar"] .stTextInput input,
-    section[data-testid="stSidebar"] .stTextArea textarea,
-    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-        background-color: #1E293B !important;
-        color: #F8FAFC !important;
-        border: 1px solid #475569 !important;
-        border-radius: 8px !important;
-    }
-    section[data-testid="stSidebar"] details {
-        background-color: rgba(30, 41, 59, 0.75) !important;
-        border: 1px solid #334155 !important;
-        border-radius: 10px !important;
-        margin-bottom: 10px !important;
-    }
-    section[data-testid="stSidebar"] .stButton > button {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
-        border: 1px solid #3B82F6 !important;
-        color: #FFFFFF !important;
-        font-weight: 600 !important;
-        border-radius: 8px !important;
+    /* Tự động kéo giãn các khung viền (container) bên trong cột */
+    div[data-testid="column"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+        height: calc(100% - 1rem) !important;
+        display: flex;
+        flex-direction: column;
     }
 
-    /* HERO BANNER ĐẲNG CẤP TRÊN CÙNG */
-    .hero-banner {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #1D4ED8 100%);
-        padding: 20px 28px;
-        border-radius: 16px;
-        color: #FFFFFF;
-        box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.28);
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-    }
-    .hero-title {
-        font-size: 25px;
-        font-weight: 800;
-        letter-spacing: -0.3px;
-        margin: 0 0 6px 0;
-        color: #FFFFFF;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .hero-sub {
-        font-size: 13.5px;
-        color: #CBD5E1;
-        margin: 0;
-        font-weight: 400;
-    }
-    .hero-badges {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-    .cyber-badge {
-        background: rgba(255, 255, 255, 0.12);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        color: #F8FAFC;
-        padding: 6px 13px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-    .cyber-badge-green {
-        background: rgba(16, 185, 129, 0.22);
-        border: 1px solid #34D399;
-        color: #A7F3D0;
-        padding: 6px 13px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
+    /* Đẩy nút "BẮT ĐẦU DỊCH" xuống dính chặt vào đáy cột trái để cân bằng với cột phải */
+    div[data-testid="column"]:nth-child(1) > div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="element-container"]:last-child {
+        margin-top: auto;
     }
 
-    /* TIÊU ĐỀ PHÂN KHU TRONG CARD */
-    .zone-header-blue {
-        background: linear-gradient(90deg, #EFF6FF 0%, #DBEAFE 100%);
-        border-left: 5px solid #2563EB;
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-        color: #1E3A8A;
-        font-weight: 700;
-        font-size: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .zone-header-teal {
-        background: linear-gradient(90deg, #F0FDFA 0%, #CCFBF1 100%);
-        border-left: 5px solid #0D9488;
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-top: 8px;
-        margin-bottom: 12px;
-        color: #115E59;
-        font-weight: 700;
-        font-size: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .step-pill {
-        background: #1E3A8A;
-        color: #FFFFFF;
-        font-size: 11px;
-        padding: 2px 9px;
-        border-radius: 99px;
-        font-weight: 700;
-    }
-    .step-pill-teal {
-        background: #0F766E;
-        color: #FFFFFF;
-        font-size: 11px;
-        padding: 2px 9px;
-        border-radius: 99px;
-        font-weight: 700;
-    }
+    /* CSS GIAO DIỆN DARK-NAVY & DIGITAL COCKPIT (GIỮ NGUYÊN BẢN V7.0) */
+    section[data-testid="stSidebar"] { background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%) !important; border-right: 1px solid #334155; }
+    section[data-testid="stSidebar"] * { color: #F8FAFC !important; }
+    section[data-testid="stSidebar"] .stTextInput input, section[data-testid="stSidebar"] .stTextArea textarea, section[data-testid="stSidebar"] div[data-baseweb="select"] > div { background-color: #1E293B !important; color: #F8FAFC !important; border: 1px solid #475569 !important; border-radius: 8px !important; }
+    section[data-testid="stSidebar"] details { background-color: rgba(30, 41, 59, 0.75) !important; border: 1px solid #334155 !important; border-radius: 10px !important; margin-bottom: 10px !important; }
+    section[data-testid="stSidebar"] .stButton > button { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; border: 1px solid #3B82F6 !important; color: #FFFFFF !important; font-weight: 600 !important; border-radius: 8px !important; }
 
-    /* KHUNG CONTAINER TRẮNG NỔI BẬT */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FFFFFF !important;
-        border-radius: 14px !important;
-        border: 1px solid #CBD5E1 !important;
-        box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.07) !important;
-        padding: 6px !important;
-    }
+    .hero-banner { background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #1D4ED8 100%); padding: 16px 28px; border-radius: 16px; color: #FFFFFF; box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.28); margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255, 255, 255, 0.14); }
+    .hero-title { font-size: 24px; font-weight: 800; letter-spacing: -0.3px; margin: 0 0 4px 0; color: #FFFFFF; display: flex; align-items: center; gap: 10px; }
+    .hero-sub { font-size: 13.5px; color: #CBD5E1; margin: 0; font-weight: 400; }
+    .hero-badges { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .cyber-badge { background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.25); color: #F8FAFC; padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .cyber-badge-green { background: rgba(16, 185, 129, 0.22); border: 1px solid #34D399; color: #A7F3D0; padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 
-    /* LÀM NỔI BẬT KHUNG KÉO THẢ FILE (DROPZONE) */
-    section[data-testid="stFileUploaderDropzone"] {
-        background: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 100%) !important;
-        border: 2px dashed #3B82F6 !important;
-        border-radius: 12px !important;
-        padding: 18px !important;
-        transition: all 0.25s ease;
-    }
-    section[data-testid="stFileUploaderDropzone"]:hover {
-        border-color: #1D4ED8 !important;
-        background: #DBEAFE !important;
-    }
+    .zone-header-blue { background: linear-gradient(90deg, #EFF6FF 0%, #DBEAFE 100%); border-left: 5px solid #2563EB; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; color: #1E3A8A; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+    .zone-header-teal { background: linear-gradient(90deg, #F0FDFA 0%, #CCFBF1 100%); border-left: 5px solid #0D9488; padding: 10px 14px; border-radius: 8px; margin-top: 8px; margin-bottom: 12px; color: #115E59; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+    .step-pill { background: #1E3A8A; color: #FFFFFF; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 700; }
+    .step-pill-teal { background: #0F766E; color: #FFFFFF; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 700; }
 
-    /* 3 THẺ THỐNGNG KÊ KPI KỸ THUẬT SỐ */
-    .kpi-card {
-        background: #FFFFFF;
-        border-radius: 12px;
-        padding: 12px 16px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .kpi-blue { border-top: 4px solid #2563EB; }
-    .kpi-purple { border-top: 4px solid #7C3AED; }
-    .kpi-emerald { border-top: 4px solid #10B981; }
-    .kpi-icon {
-        font-size: 22px;
-        background: #F1F5F9;
-        width: 42px;
-        height: 42px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 10px;
-    }
-    .kpi-label {
-        font-size: 11.5px;
-        font-weight: 600;
-        color: #64748B;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-    }
-    .kpi-value {
-        font-size: 15.5px;
-        font-weight: 800;
-        color: #0F172A;
-        margin-top: 2px;
-    }
+    div[data-testid="stVerticalBlockBorderWrapper"] { background-color: #FFFFFF !important; border-radius: 14px !important; border: 1px solid #CBD5E1 !important; box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.07) !important; padding: 6px !important; }
+    section[data-testid="stFileUploaderDropzone"] { background: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 100%) !important; border: 2px dashed #3B82F6 !important; border-radius: 12px !important; padding: 18px !important; transition: all 0.25s ease; }
+    section[data-testid="stFileUploaderDropzone"]:hover { border-color: #1D4ED8 !important; background: #DBEAFE !important; }
 
-    /* MÀN HÌNH TERMINAL MAC-OS */
-    .terminal-wrapper {
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #1E293B;
-        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35);
-        margin-bottom: 8px;
-    }
-    .terminal-bar {
-        background: #1E293B;
-        padding: 8px 14px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-bottom: 1px solid #334155;
-    }
-    .term-dots {
-        display: flex;
-        gap: 7px;
-    }
-    .dot-r { width: 11px; height: 11px; border-radius: 50%; background: #EF4444; display: inline-block; }
-    .dot-y { width: 11px; height: 11px; border-radius: 50%; background: #F59E0B; display: inline-block; }
-    .dot-g { width: 11px; height: 11px; border-radius: 50%; background: #10B981; display: inline-block; }
-    .term-title {
-        color: #94A3B8;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 11.5px;
-        font-weight: 600;
-    }
-    .log-container {
-        background-color: #090D16;
-        color: #34D399;
-        font-family: 'JetBrains Mono', monospace;
-        padding: 14px 16px;
-        height: 290px;
-        overflow-y: auto;
-        font-size: 12.5px;
-        line-height: 1.65;
-    }
+    .kpi-card { background: #FFFFFF; border-radius: 12px; padding: 10px 14px; border: 1px solid #E2E8F0; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04); display: flex; align-items: center; gap: 12px; }
+    .kpi-blue { border-top: 4px solid #2563EB; } .kpi-purple { border-top: 4px solid #7C3AED; } .kpi-emerald { border-top: 4px solid #10B981; }
+    .kpi-icon { font-size: 20px; background: #F1F5F9; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+    .kpi-label { font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.4px; }
+    .kpi-value { font-size: 15px; font-weight: 800; color: #0F172A; margin-top: 2px; }
 
-    /* NÚT BẤM CHÍNH (PRIMARY BUTTON) NỔI BẬT */
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 50%, #1E40AF 100%) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 0.65rem 1.2rem !important;
-        font-weight: 700 !important;
-        font-size: 14.5px !important;
-        letter-spacing: 0.2px !important;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important;
-        transition: all 0.2s ease !important;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 8px 22px rgba(29, 78, 216, 0.48) !important;
-    }
-    div.stDownloadButton > button {
-        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 0.7rem 1.2rem !important;
-        font-weight: 700 !important;
-        box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35) !important;
-    }
+    .terminal-wrapper { border-radius: 12px; overflow: hidden; border: 1px solid #1E293B; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35); margin-bottom: 8px; }
+    .terminal-bar { background: #1E293B; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
+    .term-dots { display: flex; gap: 7px; }
+    .dot-r { width: 11px; height: 11px; border-radius: 50%; background: #EF4444; display: inline-block; } .dot-y { width: 11px; height: 11px; border-radius: 50%; background: #F59E0B; display: inline-block; } .dot-g { width: 11px; height: 11px; border-radius: 50%; background: #10B981; display: inline-block; }
+    .term-title { color: #94A3B8; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 600; }
+    .log-container { background-color: #090D16; color: #34D399; font-family: 'JetBrains Mono', monospace; padding: 14px 16px; height: 350px; overflow-y: auto; font-size: 12.5px; line-height: 1.65; }
+
+    div.stButton > button[kind="primary"] { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 50%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 10px !important; padding: 0.65rem 1.2rem !important; font-weight: 700 !important; font-size: 14.5px !important; letter-spacing: 0.2px !important; box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35) !important; transition: all 0.2s ease !important; }
+    div.stButton > button[kind="primary"]:hover { transform: translateY(-1px) !important; box-shadow: 0 8px 22px rgba(29, 78, 216, 0.48) !important; }
+    div.stDownloadButton > button { background: linear-gradient(135deg, #059669 0%, #047857 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 10px !important; padding: 0.7rem 1.2rem !important; font-weight: 700 !important; box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35) !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1194,13 +967,18 @@ with col_work:
         )
         direction = st.radio("🌐 Chiều dịch thuật:", ["Việt → Anh", "Anh → Việt"], horizontal=True)
         
+        # Dùng container có viền (border=True) kết hợp với CSS Flexbox để ép 2 khối cao bằng nhau tuyệt đối
         opt_c1, opt_c2 = st.columns(2)
         with opt_c1:
-            bilingual = st.checkbox("📖 Xuất Song Ngữ\n(Gốc + Dịch dòng dưới)", value=False)
-            translate_sheets = st.checkbox("📑 Dịch tên Sheet Excel", value=True)
+            with st.container(border=True):
+                st.markdown("**📄 Xử lý Ngôn ngữ**")
+                bilingual = st.checkbox("📖 Xuất Song Ngữ", value=False, help="Giữ câu gốc, thêm bản dịch ở dòng dưới")
+                translate_sheets = st.checkbox("📑 Dịch tên Sheet", value=True)
         with opt_c2:
-            auto_fit = st.checkbox("📐 Auto-Fit Layout\n(Tự xuống dòng & giãn cột)", value=True)
-            enable_review = st.checkbox("✍️ Duyệt & Hiệu đính\ntrước khi xuất File", value=True)
+            with st.container(border=True):
+                st.markdown("**⚙️ Căn chỉnh & Duyệt**")
+                auto_fit = st.checkbox("📐 Auto-Fit Layout", value=True, help="Tự động xuống dòng và giãn cột Excel")
+                enable_review = st.checkbox("✍️ Duyệt & Hiệu đính", value=True)
 
         st.write("")
         btn_label = "🚀 BẮT ĐẦU PHÂN TÍCH & DỊCH NHÁP (ĐỂ HIỆU ĐÍNH)" if enable_review else "🚀 BẮT ĐẦU DỊCH & XUẤT FILE NGAY"
