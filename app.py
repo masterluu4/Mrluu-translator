@@ -7,6 +7,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 import pandas as pd
+import google.generativeai as genai
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
